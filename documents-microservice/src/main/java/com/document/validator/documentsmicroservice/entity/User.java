@@ -1,4 +1,4 @@
-package com.document.validator.usersmicroservice.entity;
+package com.document.validator.documentsmicroservice.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
