@@ -5,11 +5,9 @@ import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
-import com.document.validator.documentsmicroservice.utils.CriptographySimuladorHsm;
 import com.document.validator.documentsmicroservice.repository.DocumentRepository;
 import com.google.gson.Gson;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.StringUtils;
@@ -34,11 +32,8 @@ public class DocumentService {
     @Autowired
     UserRepository userRepository;
 
-    @Autowired
-    CriptographySimuladorHsm cripto;
-
-    @Value("${app.upload.dir}")
-    public String uploadDir;
+    public String uploadDir = "/tmp";
+    //public String uploadDir = "C:\\Temporal";
 
 
 
@@ -94,7 +89,7 @@ public class DocumentService {
             e.printStackTrace();
             responseDTO.setStatus(0);
             responseDTO.setCodeError("INTERNAL");
-            responseDTO.setMsgError("No se pudo guardar el archivo " + file.getOriginalFilename() + ". ¡Prueba Nuevamente!");
+            responseDTO.setMsgError("No se pudo guardar el archivo " + file.getOriginalFilename() + ". ¡Prueba Nuevamente!.  Exception: " + e.getMessage());
         }
         return responseDTO;
     }
@@ -155,19 +150,29 @@ public class DocumentService {
                     responseDTO.setMsgError("El documento contiene la firma pero fue modificado");
                     return responseDTO;
                 }else{
-                    documentBD = documentRepository.getReferenceById(document.getId());
-                    if(!documentBD.getHashSignedDocument().equals(generaHash(rutaArchivoFirmado))){
-                        responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU002");
-                        responseDTO.setMsgError("El documento contiene la firma pero fue modificado");
-                        return responseDTO;
+                    documentBD = documentRepository.findById(document.getId()).orElse(null);
+                    if(documentBD!=null) {
+                        if (!documentBD.getHashSignedDocument().equals(generaHash(rutaArchivoFirmado))) {
+                            responseDTO.setStatus(1);
+                            responseDTO.setCodeError("DOCU002");
+                            responseDTO.setMsgError("El documento contiene la firma pero fue modificado");
+                            return responseDTO;
+                        } else {
+                            user = userRepository.getReferenceById(document.getCreatedBy());
+                        }
                     }else{
-                        user = userRepository.getReferenceById(document.getCreatedBy());
+                        responseDTO.setStatus(1);
+                        responseDTO.setCodeError("DOCU003");
+                        responseDTO.setMsgError("El documento contiene una firma no reconocida");
+                        return responseDTO;
                     }
                 }
 
             }catch(Exception e){
                 e.printStackTrace();
+                responseDTO.setStatus(0);
+                responseDTO.setCodeError("INTERNAL");
+                responseDTO.setMsgError("Could not store file " + file.getOriginalFilename() + ". Please try again!. Exception: " + e.getMessage());
             }finally{
                 // En el finally cerramos el fichero, para asegurarnos
                 // que se cierra tanto si todo va bien como si salta
@@ -181,6 +186,8 @@ public class DocumentService {
                 }
             }
 
+            Files.delete(copyLocation);
+
             //responseDTO.setDocument(documentBD);
             //responseDTO.setUser(user);
             responseDTO.setStatus(0);
@@ -190,7 +197,7 @@ public class DocumentService {
             e.printStackTrace();
             responseDTO.setStatus(0);
             responseDTO.setCodeError("INTERNAL");
-            responseDTO.setMsgError("Could not store file " + file.getOriginalFilename() + ". Please try again!");
+            responseDTO.setMsgError("Could not store file " + file.getOriginalFilename() + ". Please try again!. Exception: " + e.getMessage());
         }
         return responseDTO;
     }
@@ -280,6 +287,8 @@ public class DocumentService {
                 InputStream inputStream = new BufferedInputStream(new FileInputStream(file));
 
                 FileCopyUtils.copy(inputStream, response.getOutputStream());
+
+                file.delete();
 
             }
         }catch (Exception e){
