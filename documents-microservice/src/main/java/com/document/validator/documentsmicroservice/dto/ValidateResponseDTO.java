@@ -1,11 +1,14 @@
 package com.document.validator.documentsmicroservice.dto;
 
-import com.document.validator.documentsmicroservice.entity.Document;
-import com.document.validator.documentsmicroservice.entity.User;
 import lombok.Data;
+
+import java.util.Date;
 
 @Data
 public class ValidateResponseDTO extends GenericResponseDTO{
-    //private User user;
-    //private Document document;
+    private int documentId;
+    private Date createdDate;
+    private String originalName;
+    private String author;
+    private String email;
 }

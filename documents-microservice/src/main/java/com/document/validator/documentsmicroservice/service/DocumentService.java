@@ -152,13 +152,17 @@ public class DocumentService {
                 }else{
                     documentBD = documentRepository.findById(document.getId()).orElse(null);
                     if(documentBD!=null) {
+                        user = userRepository.getReferenceById(document.getCreatedBy());
                         if (!documentBD.getHashSignedDocument().equals(generaHash(rutaArchivoFirmado))) {
+                            responseDTO.setDocumentId(documentBD.getId());
+                            responseDTO.setCreatedDate(documentBD.getCreatedDate());
+                            responseDTO.setOriginalName(documentBD.getFileName());
+                            responseDTO.setAuthor(user.getName());
+                            responseDTO.setEmail(user.getEmail());
                             responseDTO.setStatus(1);
                             responseDTO.setCodeError("DOCU002");
                             responseDTO.setMsgError("El documento contiene la firma pero fue modificado");
                             return responseDTO;
-                        } else {
-                            user = userRepository.getReferenceById(document.getCreatedBy());
                         }
                     }else{
                         responseDTO.setStatus(1);
@@ -173,6 +177,7 @@ public class DocumentService {
                 responseDTO.setStatus(0);
                 responseDTO.setCodeError("INTERNAL");
                 responseDTO.setMsgError("Could not store file " + file.getOriginalFilename() + ". Please try again!. Exception: " + e.getMessage());
+                return responseDTO;
             }finally{
                 // En el finally cerramos el fichero, para asegurarnos
                 // que se cierra tanto si todo va bien como si salta
@@ -190,6 +195,12 @@ public class DocumentService {
 
             //responseDTO.setDocument(documentBD);
             //responseDTO.setUser(user);
+            responseDTO.setDocumentId(documentBD.getId());
+            responseDTO.setCreatedDate(documentBD.getCreatedDate());
+            responseDTO.setOriginalName(documentBD.getFileName());
+            responseDTO.setAuthor(user.getName());
+            responseDTO.setEmail(user.getEmail());
+
             responseDTO.setStatus(0);
             responseDTO.setCodeError("DOCU000");
             responseDTO.setMsgError("OK");
