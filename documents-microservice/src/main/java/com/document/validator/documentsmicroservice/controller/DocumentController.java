@@ -1,6 +1,7 @@
 package com.document.validator.documentsmicroservice.controller;
 
 import com.document.validator.documentsmicroservice.dto.GenericResponseDTO;
+import com.document.validator.documentsmicroservice.dto.ImageReadResponseDTO;
 import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
 import com.document.validator.documentsmicroservice.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,17 @@ public class DocumentController {
                                     @PathVariable("fileName") String fileName) throws IOException {
 
         documentService.download(fileName,response);
+    }
+
+    @PostMapping("/readImage")
+    public ResponseEntity<ImageReadResponseDTO> readImage(@RequestParam("file") MultipartFile file) throws Exception {
+
+        ImageReadResponseDTO responseDTO= documentService.readImage(file);
+
+        if(responseDTO.getStatus()==0)
+            return ResponseEntity.ok(responseDTO);
+        else
+            return ResponseEntity.badRequest().body(responseDTO);
     }
 
 }

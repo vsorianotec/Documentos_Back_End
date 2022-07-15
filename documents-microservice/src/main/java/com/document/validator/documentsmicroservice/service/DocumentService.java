@@ -1,18 +1,29 @@
 package com.document.validator.documentsmicroservice.service;
 
+import com.aspose.imaging.Image;
+import com.aspose.imaging.ImageOptionsBase;
+import com.aspose.imaging.imageoptions.BmpOptions;
+import com.aspose.imaging.sources.FileCreateSource;
+import com.document.validator.documentsmicroservice.dto.GenericResponseDTO;
+import com.document.validator.documentsmicroservice.dto.ImageReadResponseDTO;
 import com.document.validator.documentsmicroservice.dto.SingResponseDTO;
 import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
 import com.document.validator.documentsmicroservice.repository.DocumentRepository;
+import com.document.validator.documentsmicroservice.utils.Esteganografia;
+import com.document.validator.documentsmicroservice.utils.ImageRGB;
 import com.google.gson.Gson;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -20,7 +31,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
+import java.util.AbstractMap;
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FilenameUtils;
 
@@ -32,16 +45,21 @@ public class DocumentService {
     @Autowired
     UserRepository userRepository;
 
-    public String uploadDir = "/tmp";
-    //public String uploadDir = "C:\\Temporal";
+    //public String uploadDir = "/tmp";
+    public String uploadDir = "C:\\Temporal";
 
+    public String test= "C:\\Temporal\\91529e0e-58e5-4638-b502-c8e3115ecac9.jpeg";
 
+    @Autowired
+    Esteganografia esteganografia;
 
     public SingResponseDTO sign(MultipartFile file, String description, int userId){
         SingResponseDTO responseDTO=new SingResponseDTO();
         try {
             String uuid = UUID.randomUUID().toString();
-            String fileName= uuid + "."+ FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
+            String extension = FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
+
+            String fileName= uuid + "."+ extension;
             String rutaArchivoFirmado= uploadDir + File.separator + fileName;
 
             Path copyLocation = Paths
@@ -81,6 +99,20 @@ public class DocumentService {
             document.setHashSignedDocument(generaHash(rutaArchivoFirmado));
             documentRepository.save(document);
 
+            java.nio.file.Files.setAttribute(copyLocation,"dos:readonly",true);
+
+            if(extension.equals("jpeg")){
+                String rutaBMP= uploadDir + File.separator + uuid + ".bmp";
+                boolean ok=convertToBMP(rutaArchivoFirmado,rutaBMP);
+                if(ok){
+                    System.out.println("Se convirtio a BMP");
+                    ImageRGB imageRGB= new ImageRGB(rutaBMP.replace(".bmp",""));
+                    esteganografia.escondeTexto(imageRGB,gson.toJson(document));
+                }else{
+                    System.out.println("Error al convertir a BMP");
+                }
+            }
+
             responseDTO.setFileName(fileName);
             responseDTO.setStatus(0);
             responseDTO.setCodeError("DOCU000");
@@ -103,6 +135,7 @@ public class DocumentService {
             String rutaArchivoFirmado= uploadDir + File.separator + fileName;
             Path copyLocation = Paths
                     .get(rutaArchivoFirmado);
+
             Files.copy(file.getInputStream(), copyLocation, StandardCopyOption.REPLACE_EXISTING);
 
             FileReader archivo = null;
@@ -204,6 +237,8 @@ public class DocumentService {
             responseDTO.setStatus(0);
             responseDTO.setCodeError("DOCU000");
             responseDTO.setMsgError("OK");
+
+
         } catch (Exception e) {
             e.printStackTrace();
             responseDTO.setStatus(0);
@@ -305,5 +340,50 @@ public class DocumentService {
         }catch (Exception e){
             response.setStatus(400);
         }
+    }
+
+    public boolean convertToBMP(String inputPath,String outputPath){
+        try
+        {
+            File file = new File(inputPath);
+            BufferedImage bi = ImageIO.read(file);
+            ImageIO.write(bi, "bmp", new File(outputPath));
+            return true;
+        }catch (Exception e){
+            System.out.println(e.getMessage());
+            return false;
+        }
+    }
+
+    public ImageReadResponseDTO readImage(MultipartFile file){
+        ImageReadResponseDTO responseDTO=new ImageReadResponseDTO();
+        try {
+
+            String uuid = UUID.randomUUID().toString();
+            String fileName= uuid + "."+ FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
+            String rutaArchivoFirmado= uploadDir + File.separator + fileName;
+            Path copyLocation = Paths
+                    .get(rutaArchivoFirmado);
+
+            Files.copy(file.getInputStream(), copyLocation, StandardCopyOption.REPLACE_EXISTING);
+
+            ImageRGB imageRGB=new ImageRGB(rutaArchivoFirmado.replace(".bmp",""));
+            String texto = esteganografia.extraeTexto(imageRGB);
+
+            Files.delete(copyLocation);
+
+            responseDTO.setStatus(0);
+            responseDTO.setCodeError("DOCU000");
+            responseDTO.setMsgError("OK");
+            responseDTO.setTexto(texto);
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            responseDTO.setStatus(0);
+            responseDTO.setCodeError("INTERNAL");
+            responseDTO.setMsgError("Could not store file " + file.getOriginalFilename() + ". Please try again!. Exception: " + e.getMessage());
+        }
+        return responseDTO;
     }
 }
