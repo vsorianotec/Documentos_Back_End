@@ -23,7 +23,7 @@ public class AuthenticationService {
         if(user==null){
             response.setStatus(1);
             response.setCodeError("AUTH001");
-            response.setMsgError("Usuario no existe");
+            response.setMsgError("User not found");
             return response;
         }
 
@@ -35,7 +35,7 @@ public class AuthenticationService {
         }else{
             response.setStatus(1);
             response.setCodeError("AUTH002");
-            response.setMsgError("Password incorrecto");
+            response.setMsgError("Invalid password");
         }
         return response;
     }
