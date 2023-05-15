@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/authentication/")
-@CrossOrigin
+@CrossOrigin(origins="*", maxAge = 3600, allowCredentials = "false")
 public class AuthenticationController {
     @Autowired
     AuthenticationService authenticationService;
