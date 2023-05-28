@@ -7,17 +7,28 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 @RestController
+@CrossOrigin(origins = "*",maxAge =3600, allowCredentials = "false")
 @RequestMapping("/document/")
-@CrossOrigin
+
 public class DocumentController {
     @Autowired
     DocumentService documentService;
+
+    protected String[] getServletMappings() {
+        return new String[] { "/" };
+    }
+
+    // Added for CORS -> Not working for application level
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**"); //.allowedOrigins("https://www.alypse.ml");
+    }
 
 
     @PostMapping("/sign")

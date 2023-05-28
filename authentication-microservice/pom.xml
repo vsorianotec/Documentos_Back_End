@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.document.validator</groupId>
 	<artifactId>authentication-microservice</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>authentication-microservice</name>
 	<description>Authentication Microservice</description>
 	<properties>
@@ -72,5 +72,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

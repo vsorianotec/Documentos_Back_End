@@ -23,4 +23,16 @@ public class Document {
     private int createdBy;
     private String hashOriginalDocument;
     private String hashSignedDocument;
+    @Override
+    public String toString() {
+        return "Document [id=" + id + ", " +
+                "fileName=" + fileName +
+                "description=" + description +
+                "createdDate=" + createdDate +
+                "createdBy=" + createdBy +
+                "hashOriginalDocument=" + hashOriginalDocument +
+                "hashSignedDocument=" + fileName +
+                "fileName=" + hashSignedDocument +
+                "]";
+    }
 }
