@@ -1,7 +1,7 @@
 package com.document.validator.documentsmicroservice.service;
 
-import com.document.validator.documentsmicroservice.dto.SingResponseDTO;
-import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
+import com.document.validator.documentsmicroservice.controller.dto.SingResponseDTO;
+import com.document.validator.documentsmicroservice.controller.dto.ValidateResponseDTO;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
@@ -67,6 +67,8 @@ public class DocumentService {
     DocumentRepository documentRepository;
     @Autowired
     UserRepository userRepository;
+    @Autowired
+    FileService fileService;
 
     //public String uploadDir = "contenido/tmp/";   //En Google Cloud esta carpeta existe en memoria mientras está en ejeución
     public static String uploadDir = "C:\\Temporal";
@@ -75,31 +77,24 @@ public class DocumentService {
     //public static String uploadDir = "c:"+ File.separator +"Proyectos"+ File.separator +"Contenido";
     //public String uploadDir = "c:\\Gerardo";
     private  String nameSource = uploadDir;
-    private static String uuid;
+    public static String uuid;
     private static String fileext;
-    private String fileName;
+    //private String fileName;
     private static String rutaArchivoOriginalCompress;
-    private static String rutaArchivoOriginalQR;
+    public static String rutaArchivoOriginalQR;
 
     public SingResponseDTO sign(MultipartFile file, String description, int userId){
         SingResponseDTO responseDTO=new SingResponseDTO();
         try {
-            //System.load("C:\\Users\\gavil\\Downloads\\opencv\\opencv\\build\\java\\x64\\opencv_java460.dll");
-            //System.loadLibrary("opencv_java460");
-            //System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-            //nu.pattern.OpenCV.loadLocally();
-            OpenCV.loadShared();
-            System.out.println(Core.VERSION);
+
+            System.out.println("OpenCV Version: " + Core.VERSION);
             System.out.println("|Sign|Ini."+LocalDateTime.now());
+
             uuid = UUID.randomUUID().toString();
-            fileext = FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase();
-            if (fileext.equals("mp4")){  // Si la extensión es mp4 la cambia a extensión avi
-                fileext="avi";
-            } else if (fileext.equals("wav")) {
-                fileext="mp3";
-            }
-            System.out.println("|Sign|Type<"+fileext+">."+LocalDateTime.now());
-            fileName= uuid + "."+ fileext; //FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
+
+            fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
+
+            String fileName= uuid + "."+ fileext; //FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
             String rutaArchivoFirmado= uploadDir + File.separator + "ImgSealed" + File.separator + fileName;
             String rutaArchivoOriginal=uploadDir + File.separator + "Img" + File.separator + file.getOriginalFilename();
             rutaArchivoOriginalCompress= uploadDir + File.separator + "Img"+ File.separator + "c_"+file.getOriginalFilename();
@@ -119,79 +114,18 @@ public class DocumentService {
             File file2 = new File(rutaArchivoOriginalCompress);
             Document document = new Document();
             document.setFileName(StringUtils.cleanPath(file.getOriginalFilename()));
-            document.setDescription(uuid);
+            document.setDescription(description);
+            document.setUuid(uuid);
             document.setCreatedBy(userId);
             document.setCreatedDate(new Date());
             document.setHashOriginalDocument(generaHash(rutaArchivoFirmado));
             document = documentRepository.save(document);
-            // Verificamos si es una imagen estática para agregar código QR
-            if(fileext.equals("jpg") || fileext.equals("jpeg") || fileext.equals("png") || fileext.equals("jfif")   ){
-                // Comprimir archivo origen
-                String dc = rutaArchivoOriginal;
-                String dr = rutaArchivoOriginalCompress;
-                rutaArchivoOriginalQR=rutaArchivoOriginal;
-                File file1 = new File(dc);
-                BufferedImage image = ImageIO.read(file1);
-                OutputStream os =new FileOutputStream(new File(dr));
-                Iterator<ImageWriter> writers =  ImageIO.getImageWritersByFormatName("jpg");
-                ImageWriter writer = (ImageWriter) writers.next();
 
-                ImageOutputStream ios = ImageIO.createImageOutputStream(os);
-                writer.setOutput(ios);
+            if(fileService.isStaticImage(fileext)){
+                fileService.generateCompressImage(rutaArchivoOriginal,rutaArchivoOriginalCompress);
+                fileService.generateThumbnail(rutaArchivoOriginal,uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+uuid+".jpg");
+                fileService.sealImage(rutaArchivoOriginal,rutaArchivoOriginalCompress,document);
 
-                ImageWriteParam param = writer.getDefaultWriteParam();
-
-                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-                System.out.println("Aplicando compresion 0.99f");
-                param.setCompressionQuality(0.99f);
-                //param.setCompressionQuality(0.0f);
-                writer.write(null, new IIOImage(image, null, null), param);
-
-                os.close();
-                ios.close();
-                writer.dispose();
-                // Compression finished
-
-                // Generated thumbnail
-                String imgFile = dc;
-                //print(imgFile);
-                Mat resizeimage;
-                Mat src  =  imread(imgFile);
-                System.out.println("Type src.: "+src.type());
-                Integer sizemax = (src.cols()>src.rows())?src.cols() : src.rows();
-                resizeimage = new Mat();
-                Size scaleSize = new Size(200,100);
-                resize(src, resizeimage, scaleSize , 0, 0, INTER_AREA);
-
-                Imgcodecs.imwrite(uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+uuid+".jpg" , resizeimage);
-                System.out.println("Generated little image...: "+"m_"+uuid+".jpg");
-
-                // Generated image sealed
-                String QRPath;
-                // Generate Hash
-                String hashcontent = uuid;
-                LocalDateTime datetime = LocalDateTime.now();
-
-                String pathQR = uploadDir + File.separator +"QR"+ File.separator;
-                String nameQR = uuid+"_CodeQR";
-                System.out.println("Ruta QR: "+pathQR);
-                System.out.println(userId);
-                // QRPath = generateQR("AliPsé sealed|Id="+"IdContent="+generaHash(rutaArchivoFirmado)+"|date="+datetime.toString(),pathQR,nameQR);
-                String IdDocumento = String.valueOf(document.getId());
-                String Iddatedoc = String.valueOf(document.getCreatedDate());
-                String IdCreator = String.valueOf(document.getCreatedBy());
-                QRPath = generateQR(String.valueOf(IdDocumento)
-                        +"|"+document.getHashOriginalDocument()
-                        +"|"+Iddatedoc
-                        +"|"+IdCreator
-                        ,pathQR,nameQR,sizemax  );
-
-                File fileOrigen = new File(rutaArchivoOriginal);
-                BufferedImage imageOrigen = ImageIO.read(fileOrigen);
-                System.out.println(QRPath);
-                File fileQR = new File(QRPath);
-                BufferedImage imageQR = ImageIO.read(fileQR);
-                BufferedImage image3 = combineCodeAndBackImage(imageOrigen,imageQR,15,15);
 
             }else{
                 // En caso que no sea una imagen se igualará la variable con el archivo original
@@ -212,9 +146,9 @@ public class DocumentService {
             paquetes= (int) (Files.size(pathcompress)/256);
 
             System.out.println("Paquetes:");
-            System.out.print(paquetes);
+            System.out.println(paquetes);
             // Crear Sello AliPsé
-            System.out.print("Sello: AliPse"+uuid);
+            System.out.println("Sello: AliPse"+uuid);
             String selloAlipse = "";  // textToBinary("AlipSe"+uuid+"ESS--");
             System.out.print("Sello en Binario:");
             Gson gson = new Gson();
@@ -302,125 +236,6 @@ public class DocumentService {
         }
         System.out.println("|Sign|Fin."+LocalDateTime.now());
         return responseDTO;
-    }
-
-    public static String generateHash() {
-        SecureRandom random = new SecureRandom();
-        return new BigInteger(130, random).toString(32);
-    }
-
-    public static String generateQR(String data, String rutaqr, String nameQR, Integer sizemax) throws IOException, WriterException {
-        String datacode = data;
-        String path =rutaqr+nameQR+".jpg";
-        //int sizeQR = 120;"C:\Program Files\Java\jdk1.8.0_351\bin\java.exe" "-javaagent:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2022.3.1\lib\idea_rt.jar=50071:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2022.3.1\bin" -Dfile.encoding=UTF-8 -classpath "C:\Program Files\Java\jdk1.8.0_351\jre\lib\charsets.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\deploy.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\access-bridge-64.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\cldrdata.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\dnsns.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\jaccess.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\jfxrt.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\localedata.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\nashorn.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\sunec.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\sunjce_provider.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\sunmscapi.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\sunpkcs11.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\ext\zipfs.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\javaws.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\jce.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\jfr.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\jfxswt.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\jsse.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\management-agent.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\plugin.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\resources.jar;C:\Program Files\Java\jdk1.8.0_351\jre\lib\rt.jar;C:\Proyectos\documents-microservice\target\classes;C:\libs\opencv\opencv\build\java\opencv-460.jar;C:\libs\ImShow-Java-OpenCV-master\ImShow-Java-OpenCV-master\Imshow.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-data-jpa\2.7.1\spring-boot-starter-data-jpa-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-aop\2.7.1\spring-boot-starter-aop-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-aop\5.3.21\spring-aop-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\aspectj\aspectjweaver\1.9.7\aspectjweaver-1.9.7.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-jdbc\2.7.1\spring-boot-starter-jdbc-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\com\zaxxer\HikariCP\4.0.3\HikariCP-4.0.3.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-jdbc\5.3.21\spring-jdbc-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\transaction\jakarta.transaction-api\1.3.3\jakarta.transaction-api-1.3.3.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\persistence\jakarta.persistence-api\2.2.3\jakarta.persistence-api-2.2.3.jar;C:\Users\conmak_cloud\.m2\repository\org\hibernate\hibernate-core\5.6.9.Final\hibernate-core-5.6.9.Final.jar;C:\Users\conmak_cloud\.m2\repository\org\jboss\logging\jboss-logging\3.4.3.Final\jboss-logging-3.4.3.Final.jar;C:\Users\conmak_cloud\.m2\repository\net\bytebuddy\byte-buddy\1.12.11\byte-buddy-1.12.11.jar;C:\Users\conmak_cloud\.m2\repository\antlr\antlr\2.7.7\antlr-2.7.7.jar;C:\Users\conmak_cloud\.m2\repository\org\jboss\jandex\2.4.2.Final\jandex-2.4.2.Final.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\classmate\1.5.1\classmate-1.5.1.jar;C:\Users\conmak_cloud\.m2\repository\org\hibernate\common\hibernate-commons-annotations\5.1.2.Final\hibernate-commons-annotations-5.1.2.Final.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jaxb\jaxb-runtime\2.3.6\jaxb-runtime-2.3.6.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jaxb\txw2\2.3.6\txw2-2.3.6.jar;C:\Users\conmak_cloud\.m2\repository\com\sun\istack\istack-commons-runtime\3.0.12\istack-commons-runtime-3.0.12.jar;C:\Users\conmak_cloud\.m2\repository\com\sun\activation\jakarta.activation\1.2.2\jakarta.activation-1.2.2.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\data\spring-data-jpa\2.7.1\spring-data-jpa-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\data\spring-data-commons\2.7.1\spring-data-commons-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-orm\5.3.21\spring-orm-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-context\5.3.21\spring-context-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-tx\5.3.21\spring-tx-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-beans\5.3.21\spring-beans-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-aspects\5.3.21\spring-aspects-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-web\2.7.1\spring-boot-starter-web-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter\2.7.1\spring-boot-starter-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot\2.7.1\spring-boot-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\2.7.1\spring-boot-autoconfigure-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-logging\2.7.1\spring-boot-starter-logging-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\ch\qos\logback\logback-classic\1.2.11\logback-classic-1.2.11.jar;C:\Users\conmak_cloud\.m2\repository\ch\qos\logback\logback-core\1.2.11\logback-core-1.2.11.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.17.2\log4j-to-slf4j-2.17.2.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\logging\log4j\log4j-api\2.17.2\log4j-api-2.17.2.jar;C:\Users\conmak_cloud\.m2\repository\org\slf4j\jul-to-slf4j\1.7.36\jul-to-slf4j-1.7.36.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\annotation\jakarta.annotation-api\1.3.5\jakarta.annotation-api-1.3.5.jar;C:\Users\conmak_cloud\.m2\repository\org\yaml\snakeyaml\1.30\snakeyaml-1.30.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-json\2.7.1\spring-boot-starter-json-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.13.3\jackson-datatype-jdk8-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.13.3\jackson-datatype-jsr310-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.13.3\jackson-module-parameter-names-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\2.7.1\spring-boot-starter-tomcat-2.7.1.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\9.0.64\tomcat-embed-core-9.0.64.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\9.0.64\tomcat-embed-el-9.0.64.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\9.0.64\tomcat-embed-websocket-9.0.64.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-web\5.3.21\spring-web-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-webmvc\5.3.21\spring-webmvc-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-expression\5.3.21\spring-expression-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\projectlombok\lombok\1.18.24\lombok-1.18.24.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\2.3.3\jakarta.xml.bind-api-2.3.3.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\activation\jakarta.activation-api\1.2.2\jakarta.activation-api-1.2.2.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-core\5.3.21\spring-core-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\org\springframework\spring-jcl\5.3.21\spring-jcl-5.3.21.jar;C:\Users\conmak_cloud\.m2\repository\mysql\mysql-connector-java\8.0.29\mysql-connector-java-8.0.29.jar;C:\Users\conmak_cloud\.m2\repository\commons-codec\commons-codec\1.15\commons-codec-1.15.jar;C:\Users\conmak_cloud\.m2\repository\com\github\albfernandez\juniversalchardet\2.0.0\juniversalchardet-2.0.0.jar;C:\Users\conmak_cloud\.m2\repository\com\google\code\gson\gson\2.8.6\gson-2.8.6.jar;C:\Users\conmak_cloud\.m2\repository\commons-io\commons-io\2.11.0\commons-io-2.11.0.jar;C:\Users\conmak_cloud\.m2\repository\com\google\zxing\javase\3.4.1\javase-3.4.1.jar;C:\Users\conmak_cloud\.m2\repository\com\beust\jcommander\1.78\jcommander-1.78.jar;C:\Users\conmak_cloud\.m2\repository\com\github\jai-imageio\jai-imageio-core\1.4.0\jai-imageio-core-1.4.0.jar;C:\Users\conmak_cloud\.m2\repository\com\google\zxing\core\3.3.0\core-3.3.0.jar;C:\Users\conmak_cloud\.m2\repository\org\openpnp\opencv\3.2.0-0\opencv-3.2.0-0.jar;C:\Users\conmak_cloud\.m2\repository\nu\pattern\opencv\2.4.9-4\opencv-2.4.9-4.jar;C:\Users\conmak_cloud\.m2\repository\org\telegram\telegrambots\5.0.1\telegrambots-5.0.1.jar;C:\Users\conmak_cloud\.m2\repository\org\telegram\telegrambots-meta\5.0.1\telegrambots-meta-5.0.1.jar;C:\Users\conmak_cloud\.m2\repository\com\google\guava\guava\30.0-jre\guava-30.0-jre.jar;C:\Users\conmak_cloud\.m2\repository\com\google\guava\failureaccess\1.0.1\failureaccess-1.0.1.jar;C:\Users\conmak_cloud\.m2\repository\com\google\guava\listenablefuture\9999.0-empty-to-avoid-conflict-with-guava\listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar;C:\Users\conmak_cloud\.m2\repository\com\google\code\findbugs\jsr305\3.0.2\jsr305-3.0.2.jar;C:\Users\conmak_cloud\.m2\repository\org\checkerframework\checker-qual\3.5.0\checker-qual-3.5.0.jar;C:\Users\conmak_cloud\.m2\repository\com\google\errorprone\error_prone_annotations\2.3.4\error_prone_annotations-2.3.4.jar;C:\Users\conmak_cloud\.m2\repository\com\google\j2objc\j2objc-annotations\1.3\j2objc-annotations-1.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.13.3\jackson-annotations-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\jaxrs\jackson-jaxrs-json-provider\2.13.3\jackson-jaxrs-json-provider-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\jaxrs\jackson-jaxrs-base\2.13.3\jackson-jaxrs-base-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\module\jackson-module-jaxb-annotations\2.13.3\jackson-module-jaxb-annotations-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.13.3\jackson-core-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.13.3\jackson-databind-2.13.3.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\inject\jersey-hk2\2.35\jersey-hk2-2.35.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\core\jersey-common\2.35\jersey-common-2.35.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\hk2\osgi-resource-locator\1.0.3\osgi-resource-locator-1.0.3.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\hk2\hk2-locator\2.6.1\hk2-locator-2.6.1.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\hk2\external\aopalliance-repackaged\2.6.1\aopalliance-repackaged-2.6.1.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\hk2\hk2-api\2.6.1\hk2-api-2.6.1.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\hk2\hk2-utils\2.6.1\hk2-utils-2.6.1.jar;C:\Users\conmak_cloud\.m2\repository\org\javassist\javassist\3.25.0-GA\javassist-3.25.0-GA.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\media\jersey-media-json-jackson\2.35\jersey-media-json-jackson-2.35.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\ext\jersey-entity-filtering\2.35\jersey-entity-filtering-2.35.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\containers\jersey-container-grizzly2-http\2.35\jersey-container-grizzly2-http-2.35.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\hk2\external\jakarta.inject\2.6.1\jakarta.inject-2.6.1.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\grizzly\grizzly-http-server\2.4.4\grizzly-http-server-2.4.4.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\grizzly\grizzly-http\2.4.4\grizzly-http-2.4.4.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\grizzly\grizzly-framework\2.4.4\grizzly-framework-2.4.4.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\ws\rs\jakarta.ws.rs-api\2.1.6\jakarta.ws.rs-api-2.1.6.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\core\jersey-server\2.35\jersey-server-2.35.jar;C:\Users\conmak_cloud\.m2\repository\org\glassfish\jersey\core\jersey-client\2.35\jersey-client-2.35.jar;C:\Users\conmak_cloud\.m2\repository\jakarta\validation\jakarta.validation-api\2.0.2\jakarta.validation-api-2.0.2.jar;C:\Users\conmak_cloud\.m2\repository\org\json\json\20180813\json-20180813.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\httpcomponents\httpclient\4.5.13\httpclient-4.5.13.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\httpcomponents\httpcore\4.4.15\httpcore-4.4.15.jar;C:\Users\conmak_cloud\.m2\repository\org\apache\httpcomponents\httpmime\4.5.13\httpmime-4.5.13.jar;C:\Users\conmak_cloud\.m2\repository\org\slf4j\slf4j-api\1.7.36\slf4j-api-1.7.36.jar" com.document.validator.documentsmicroservice.DocumentsMicroserviceApplication
-        int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
-        sizeQR = (sizeQR<120)?120:sizeQR;
-        Map<EncodeHintType, Object> hints = new HashMap<>();
-        hints.put (EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H); // Establecer la tasa de tolerancia a fallas al valor predeterminado más alto
-        hints.put (EncodeHintType.CHARACTER_SET, "UTF-8"); // La codificación de caracteres es UTF-8
-        hints.put (EncodeHintType.MARGIN, 1); // El área en blanco del código QR, el mínimo es 0 y hay bordes blancos, pero es muy pequeño, el mínimo es alrededor del 6%
-
-        BitMatrix matrix=new MultiFormatWriter().encode(data, BarcodeFormat.QR_CODE, sizeQR, sizeQR, hints);
-        MatrixToImageWriter.writeToPath(matrix,"jpg", Paths.get(path));
-
-        ////
-        Mat resizeimage;
-
-        Mat src  =  imread(rutaqr+"logo.jpg");
-        resizeimage = new Mat();
-        Size scaleSize = new Size(30,30);
-        resize(src, resizeimage, scaleSize , 0, 0, INTER_AREA);
-        Imgcodecs.imwrite(rutaqr+"logo30x30.jpg", resizeimage);
-
-        BufferedImage background1 = ImageIO.read(new File(rutaqr + nameQR + ".jpg"));
-        BufferedImage foreground1 = ImageIO.read(new File(rutaqr + "logo30x30.jpg"));
-
-        BufferedImage bufferedImage1 = new BufferedImage(background1.getWidth(),background1.getHeight(),BufferedImage.TYPE_INT_RGB);
-        Graphics2D g2d1 = bufferedImage1.createGraphics();
-
-        g2d1.drawImage(background1, 0, 0,null);
-
-        int x = (background1.getWidth() - foreground1.getWidth()) / 2;
-        int y = (background1.getHeight() - foreground1.getHeight()) / 2;
-        g2d1.drawImage(foreground1, x, y, null);
-        g2d1.dispose();
-        ImageIO.write(bufferedImage1,"JPEG", new File(rutaqr + nameQR + ".jpg"));
-        ////
-
-        return path;
-    }
-
-    private static BufferedImage combineCodeAndBackImage(BufferedImage codeImage, BufferedImage backImage) throws IOException {
-        return combineCodeAndBackImage(codeImage, backImage, -1, 100);
-    }
-    private static BufferedImage combineCodeAndBackImage(BufferedImage codeImage, BufferedImage backImage, int marginLeft, int marginBottom) throws IOException {
-        long start = System.currentTimeMillis();
-        Graphics2D backImageGraphics = backImage.createGraphics();
-        // Determine las coordenadas del código QR en la esquina superior izquierda de la imagen de fondo
-        int x = marginLeft;
-        if (marginLeft == -1) {
-            x = (backImage.getWidth() - codeImage.getWidth()) / 2;
-        }
-        int y = backImage.getHeight() - codeImage.getHeight() - marginBottom;
-
-        // Generate image with QR code
-        TestPane test=  (new TestPane());
-
-        return backImage;
-    }
-
-    public static class TestPane extends JPanel {
-
-        private BufferedImage background;
-        private BufferedImage foreground;
-
-        private BufferedImage finishimage;
-        //File outputfile = new File("C:\\Gerardo\\Workspace\\Contenido\\ImgSealed\\"+uuid+"QR.jpg");
-        File outputfile = new File(uploadDir+ File.separator +"ImgSealed"+ File.separator +uuid+"QR.jpg");
-
-        public TestPane() throws IOException {
-            try {
-                System.out.println("Open images to convinated");
-                background = ImageIO.read(new File(rutaArchivoOriginalQR));
-                System.out.println("Ruta archivo para QR :"+rutaArchivoOriginalQR);
-                System.out.println("Foreground:"+uploadDir+ File.separator+"QR"+File.separator+uuid+"_CodeQR.jpg");
-                foreground = ImageIO.read(new File(uploadDir+ File.separator+"QR"+File.separator+uuid+"_CodeQR.jpg"));
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-
-            // Dimension redim = new Dimension(background.getWidth(), background.getHeight());
-
-            System.out.println("Convining images.. ");
-            BufferedImage bufferedImage = new BufferedImage(background.getWidth(),background.getHeight(),BufferedImage.TYPE_INT_RGB);
-            Graphics2D g2d = bufferedImage.createGraphics();
-
-           //  if (background != null) {
-                //int x1= (getWidth() - background.getWidth()) / 2;
-                //int y1 = (getHeight() - background.getHeight()) / 2;
-                int x1 = 0, y1 = 0;
-                g2d.drawImage(background, x1, y1, this);
-            // }
-            // if (foreground != null) {
-                int x = (getWidth() - foreground.getWidth()) / 2;
-                int y = (getHeight() - foreground.getHeight()) / 2;
-                //x = (background.getWidth() / 2) - (foreground.getWidth() / 2);
-                //y = (background.getHeight() / 2) - (foreground.getHeight() / 2);
-                x = 15; ////(background.getWidth() / 2) - (foreground.getWidth() / 2);
-                y = (background.getHeight() -15) - (foreground.getHeight() );
-
-                g2d.drawImage(foreground, x, y, this);
-            // }
-            g2d.dispose();
-            try {
-                ImageIO.write(bufferedImage,"JPEG",  outputfile);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            Path fileQRLocation = Paths.get(uploadDir+ File.separator+"QR"+File.separator+uuid+"_CodeQR.jpg" );
-            Files.delete(fileQRLocation); // eliminate temp differ
-            System.out.println("Elimina el archivo QR 11: ");
-         }
     }
 
     public ValidateResponseDTO validate(MultipartFile file){

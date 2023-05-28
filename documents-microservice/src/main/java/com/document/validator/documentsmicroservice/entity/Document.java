@@ -23,6 +23,7 @@ public class Document {
     private int createdBy;
     private String hashOriginalDocument;
     private String hashSignedDocument;
+    private String uuid;
     @Override
     public String toString() {
         return "Document [id=" + id + ", " +
