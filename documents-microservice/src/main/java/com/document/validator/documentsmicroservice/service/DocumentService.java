@@ -70,18 +70,9 @@ public class DocumentService {
     @Autowired
     FileService fileService;
 
-    //public String uploadDir = "contenido/tmp/";   //En Google Cloud esta carpeta existe en memoria mientras está en ejeución
     public static String uploadDir = "C:\\Temporal";
-    //public static String uploadDir = "c:\\gerardo\\workspace\\Contenido";
-    // public static String uploadDir = "Contenido"; //directorio de la aplicación
-    //public static String uploadDir = "c:"+ File.separator +"Proyectos"+ File.separator +"Contenido";
-    //public String uploadDir = "c:\\Gerardo";
-    private  String nameSource = uploadDir;
     public static String uuid;
     private static String fileext;
-    //private String fileName;
-    private static String rutaArchivoOriginalCompress;
-    public static String rutaArchivoOriginalQR;
 
     public SingResponseDTO sign(MultipartFile file, String description, int userId){
         SingResponseDTO responseDTO=new SingResponseDTO();
@@ -97,137 +88,36 @@ public class DocumentService {
             String fileName= uuid + "."+ fileext; //FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
             String rutaArchivoFirmado= uploadDir + File.separator + "ImgSealed" + File.separator + fileName;
             String rutaArchivoOriginal=uploadDir + File.separator + "Img" + File.separator + file.getOriginalFilename();
-            rutaArchivoOriginalCompress= uploadDir + File.separator + "Img"+ File.separator + "c_"+file.getOriginalFilename();
-
-            nameSource=uploadDir + File.separator + "Img" + File.separator + file.getOriginalFilename();
+            String rutaArchivoOriginalCompress= uploadDir + File.separator + "Img"+ File.separator + "c_"+file.getOriginalFilename();
 
             Path copyLocation = Paths.get(rutaArchivoFirmado);
             Path copyLocationOri = Paths.get(rutaArchivoOriginal);
-            System.out.println(rutaArchivoFirmado);
-            System.out.println(rutaArchivoOriginal);
-            System.out.println(rutaArchivoOriginalCompress);
             Files.copy(file.getInputStream(), copyLocation, StandardCopyOption.REPLACE_EXISTING);
             Files.copy(file.getInputStream(), copyLocationOri,StandardCopyOption.REPLACE_EXISTING);
 
-            //confirma que el archivo sea gráfico estático para realizar la compresión
-
-            File file2 = new File(rutaArchivoOriginalCompress);
             Document document = new Document();
             document.setFileName(StringUtils.cleanPath(file.getOriginalFilename()));
             document.setDescription(description);
             document.setUuid(uuid);
             document.setCreatedBy(userId);
             document.setCreatedDate(new Date());
-            document.setHashOriginalDocument(generaHash(rutaArchivoFirmado));
+            document.setHashOriginalDocument(fileService.generateHash(rutaArchivoOriginal));
             document = documentRepository.save(document);
 
             if(fileService.isStaticImage(fileext)){
                 fileService.generateCompressImage(rutaArchivoOriginal,rutaArchivoOriginalCompress);
                 fileService.generateThumbnail(rutaArchivoOriginal,uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+uuid+".jpg");
-                fileService.sealImage(rutaArchivoOriginal,rutaArchivoOriginalCompress,document);
-
-
-            }else{
-                // En caso que no sea una imagen se igualará la variable con el archivo original
-                rutaArchivoOriginalCompress = rutaArchivoOriginal;
+                fileService.sealImage(rutaArchivoOriginal,rutaArchivoFirmado,document);
+            }else {
+                fileService.sealFile(rutaArchivoOriginal,rutaArchivoFirmado,document);
             }
-            rutaArchivoOriginalCompress = rutaArchivoOriginal;
-
-            // Crear un archivo destino a partir de un origen
-            // System.out.print("Tamaño del archivo "+rutaArchivoOriginalCompress+" :");
-            System.out.print("Tamaño del archivo "+rutaArchivoOriginal+" :");
-
-            int paquetes= (int) (file.getSize()/1024);
-            System.out.println(file.getSize());
-
-            //Path pathcompress = Paths.get(rutaArchivoOriginalCompress);
-            Path pathcompress = Paths.get(rutaArchivoOriginal);
-            System.out.println(Files.size(pathcompress));
-            paquetes= (int) (Files.size(pathcompress)/256);
-
-            System.out.println("Paquetes:");
-            System.out.println(paquetes);
-            // Crear Sello AliPsé
-            System.out.println("Sello: AliPse"+uuid);
-            String selloAlipse = "";  // textToBinary("AlipSe"+uuid+"ESS--");
-            System.out.print("Sello en Binario:");
-            Gson gson = new Gson();
-
-            System.out.println("Sin decodificar : " + gson.toJson(document));
-            byte[] encodedBytes = Base64.encodeBase64(gson.toJson(document).getBytes());
-
-            System.out.println("encodedBytes " + new String(encodedBytes));
-
-            selloAlipse="--AliPse" + gson.toJson(document) + "EOS--";
-            //selloAlipse="--AliPse" + new String(encodedBytes) + "EOS--";
-
-            byte[] decodedBytes = Base64.decodeBase64(encodedBytes);
-            System.out.println("decodedBytes " + new String(decodedBytes));
-
-            //Gson gson1 = new Gson();
-            //Document document1 = gson1.fromJson(decodedBytes.toString(),Document.class);
-            //System.out.print("Nombre del archivo decodificado: " +document1.getFileName());
-
-            Type collectionType = new TypeToken<Collection<Document>>(){}.getType();
-            System.out.print("<1>");
-            //Collection<Document> enums = gson.fromJson(decodedBytes.toString(), collectionType);
-            System.out.print("<2>");
-            //System.out.print("enums: " + enums.toString());
-
-            FileOutputStream fos = null;
-            DataOutputStream salida = null;
-
-            // Se abre el fichero original para lectura
-            FileInputStream fileInput = new FileInputStream(rutaArchivoOriginal);
-            BufferedInputStream bufferedInput = new BufferedInputStream(fileInput);
-
-
-            // Se abre el fichero donde se hará la copia
-            //FileOutputStream fileOutput = new FileOutputStream (uploadDir + File.separator +"ejemplo.gif");
-            FileWriter fichero = null;
-            FileOutputStream fileOutput = new FileOutputStream (rutaArchivoFirmado);
-            //fichero = new FileWriter(rutaArchivoFirmado,true);
-
-            BufferedOutputStream bufferedOutput = new BufferedOutputStream(fileOutput);
-
-            // Bucle para leer de un fichero y escribir en el otro.
-            byte [] array = new byte[256];
-            int leidos = bufferedInput.read(array);
-            int veces =1;
-            while (leidos > 0)
-            {
-                bufferedOutput.write(array,0,leidos);
-                leidos=bufferedInput.read(array);
-                if (veces>paquetes-1){
-                    // Insertar sello AliPsé
-                    System.out.print("Insertar sello AliPsé");
-                    bufferedOutput.write(selloAlipse.getBytes());
-                    // Inserta último bloque de bytes
-                    bufferedOutput.write(array,0,leidos);
-                    leidos=bufferedInput.read(array);
-                    break;
-                }
-                veces++;
-            }
-
-            // Cierre de los ficheros
-            bufferedInput.close();
-            bufferedOutput.close();
-
-            document.setHashSignedDocument(generaHash(rutaArchivoFirmado));
+            document.setHashSignedDocument(fileService.generateHash(rutaArchivoFirmado));
             documentRepository.save(document);
 
             responseDTO.setFileName(fileName);
             responseDTO.setStatus(0);
             responseDTO.setCodeError("DOCU000");
             responseDTO.setMsgError("OK");
-
-            if(fileext.equals("jpg") || fileext.equals("jpeg") || fileext.equals("png") || fileext.equals("jfif")   ) {
-                System.out.println("Elimina archivo sin QR " + rutaArchivoFirmado);
-                Path fileminiLocation = Paths.get(rutaArchivoFirmado);
-                Files.delete(fileminiLocation); // eliminate sellado sin QR
-            }
-
         } catch (Exception e) {
             e.printStackTrace();
             responseDTO.setStatus(0);
@@ -243,7 +133,7 @@ public class DocumentService {
         try {
             //System.load("C:\\Users\\gavil\\Downloads\\opencv\\opencv\\build\\java\\x64\\opencv_java460.dll");
             //System.out.println(System.getProperty("java.library.path"));
-            OpenCV.loadShared();
+            //OpenCV.loadShared();
             //System.load("opencv_java460.dll");
             //System.out.println(Core.VERSION);
             //nu.pattern.OpenCV.loadLocally();
@@ -429,7 +319,7 @@ public class DocumentService {
                         responseDTO.setOriginalName(documentBD.getFileName());
                         responseDTO.setAuthor(user.getName());
                         responseDTO.setEmail(user.getEmail());
-                        if (!documentBD.getHashSignedDocument().equals(generaHash(rutaArchivoFirmado))&&resQR=="") {
+                        if (!documentBD.getHashSignedDocument().equals(fileService.generateHash(rutaArchivoFirmado))&&resQR=="") {
                             responseDTO.setStatus(1);
                             responseDTO.setCodeError("DOCU002");
                             responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)");
@@ -783,6 +673,7 @@ public class DocumentService {
             Mat img = Imgcodecs.imread(pathfile);
             QRCodeDetector decoder = new QRCodeDetector();
             Mat points = new Mat();
+            decoder.detect(img, points);
             String data = decoder.detectAndDecode(img, points);
             System.out.println("Intento (0) resultado...: "+ points.empty());
             if (!points.empty() && data.length()>0) {
@@ -827,55 +718,7 @@ public class DocumentService {
         }
         return res;
     }
-    public static String generaHash(String rutaArchivo)
-    {
-        String hash = "";
-        //declarar funcion de resumen
-        try{
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256"); // Inicializa con algoritmo seleccionado
 
-            //leer fichero byte a byte
-            try{
-                InputStream archivo = new FileInputStream( rutaArchivo );
-                byte[] buffer = new byte[1];
-                int fin_archivo = -1;
-                int caracter;
-
-                caracter = archivo.read(buffer);
-
-                while( caracter != fin_archivo ) {
-
-                    messageDigest.update(buffer); // Pasa texto claro a la función resumen
-                    caracter = archivo.read(buffer);
-                }
-
-                archivo.close();//cerramos el archivo
-                byte[] resumen = messageDigest.digest(); // Genera el resumen
-
-                //Pasar los resumenes a hexadecimal
-
-                for (int i = 0; i < resumen.length; i++)
-                {
-                    hash += Integer.toHexString((resumen[i] >> 4) & 0xf);
-                    hash += Integer.toHexString(resumen[i] & 0xf);
-                }
-            }
-            //lectura de los datos del fichero
-            catch(java.io.FileNotFoundException fnfe) {
-                //manejar excepcion archivo no encontrado
-            }
-            catch(java.io.IOException ioe) {
-                //manejar excepcion archivo
-            }
-
-        }
-        //declarar funciones resumen
-        catch(java.security.NoSuchAlgorithmException nsae) {
-            //manejar excepcion algorito seleccionado erroneo
-        }
-        return hash;//regresamos el resumen
-
-    }
 
     public void download(String fileName,HttpServletResponse response){
         try {
