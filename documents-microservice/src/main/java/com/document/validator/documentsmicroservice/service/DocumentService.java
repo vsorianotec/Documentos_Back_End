@@ -9,20 +9,21 @@ import com.document.validator.documentsmicroservice.repository.DocumentRepositor
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.MultiFormatWriter;
-import com.google.zxing.WriterException;
+import com.google.zxing.*;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeReader;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import nu.pattern.OpenCV;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import org.apache.commons.io.FileUtils;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.QRCodeDetector;
+//import org.opencv.objdetect.QRCodeDetector;
+import com.google.zxing.common.HybridBinarizer;
 
+import org.opencv.objdetect.QRCodeDetector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
@@ -334,7 +335,7 @@ public class DocumentService {
 
                             System.out.println("<4>Find with OpenCV . "+ LocalDateTime.now());
                             System.out.println("Begin comparing...");
-                            double resCompare= compareContentQR(documentBD.getDescription(),rutaArchivoFirmado);
+                            double resCompare= compareContentQR(documentBD.getUuid(),rutaArchivoFirmado);
                             System.out.println(100-resCompare);
                             System.out.println("Finish comparing...");
                             if(100 - resCompare>99.99){
@@ -364,6 +365,17 @@ public class DocumentService {
                                 return responseDTO;
                             }
                         }
+                    }else{
+                        responseDTO.setStatus(1);
+                        responseDTO.setCodeError("DOCU002");
+                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation");
+                        System.out.println("<2> . "+ LocalDateTime.now());
+                        //Path fileminiLocation = Paths.get(uploadDir + File.separator + "Miniaturas"+ File.separator+"mtmp_"+fileName );
+                        //Files.delete(fileminiLocation); // eliminate temp mini "mtmp"
+                        System.out.println("Elimina el archivo Fake 4: <"+copyLocation+">");
+                        Files.delete(copyLocation);
+                        System.out.println("|Val|SinQRNotSaledFinFake."+LocalDateTime.now());
+                        return responseDTO;
                     }
                 }
 
@@ -426,7 +438,7 @@ public class DocumentService {
         String[] resBDdMini = new String[]{"","","","","","",""};
         Double resBestMatchMini = 200.0,resMatchMini=0.0;
         for(Document document : documents){
-            rutaArchivoMini = uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+document.getDescription()+".jpg";
+            rutaArchivoMini = uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+document.getUuid()+".jpg";
             System.out.print("Validando existencia: "+rutaArchivoMini);
             File fileMiniInBD = new File(rutaArchivoMini);
             // Checking if the specified file exists or not
@@ -544,9 +556,9 @@ public class DocumentService {
         return differ;
     }
 
-    private double compareContentQR(String description, String rutaArchivoFirmado) throws IOException {
+    private double compareContentQR(String uuid, String rutaArchivoFirmado) throws IOException {
 
-        String rutaArchivoQR = uploadDir +File.separator +"ImgSealed"+File.separator +description+"QR.jpg";
+        String rutaArchivoQR = uploadDir +File.separator +"ImgSealed"+File.separator +uuid+".jpg";
         // rutaArchivoQR = uploadDir +"\\ImgSealed\\188882cf-de91-47fe-aca3-5e669daadd35QR.jpg";
         System.out.println(rutaArchivoQR + "-" + rutaArchivoFirmado);
 
@@ -561,8 +573,8 @@ public class DocumentService {
             Mat resizeimage = new Mat();
             Size scaleSize = new Size(img111.cols(),img111.rows());
             resize(img222, img222, scaleSize , 0, 0, INTER_AREA);
-            Highgui1.imwrite(uploadDir+ File.separator+ "Img"+ File.separator +description+"_redim.jpg",img222);
-            rutaArchivoFirmado = uploadDir+File.separator+ "Img"+ File.separator +description+"_redim.jpg";
+            Highgui1.imwrite(uploadDir+ File.separator+ "Img"+ File.separator +uuid+"_redim.jpg",img222);
+            rutaArchivoFirmado = uploadDir+File.separator+ "Img"+ File.separator +uuid+"_redim.jpg";
             System.out.println("Redim " +img222.size());
         }
 
@@ -643,8 +655,8 @@ public class DocumentService {
             Mat resizeimage = new Mat();
             Size scaleSize = new Size(src1.cols(),src1.rows());
             resize(src2, src2, scaleSize , 0, 0, INTER_AREA);
-            Highgui1.imwrite(uploadDir+File.separator+"Img"+File.separator+description+"_redim_fake.jpg",src2);
-            rutaArchivoFirmado = uploadDir+File.separator+"Img"+File.separator+description+"_redim_fake.jpg";
+            Highgui1.imwrite(uploadDir+File.separator+"Img"+File.separator+uuid+"_redim_fake.jpg",src2);
+            rutaArchivoFirmado = uploadDir+File.separator+"Img"+File.separator+uuid+"_redim_fake.jpg";
             System.out.println("Redim " +src2.size());
         }
         dst = new Mat();
@@ -667,6 +679,8 @@ public class DocumentService {
         String res = "";
         try {
 
+
+
             // String pathfile = "C:\\Gerardo\\Workspace\\Contenido\\ImgSealed\\d28ade1d-c73b-49a4-b116-090cd55bff4fQR.jpg"; // Con QR
             //pathfile = "C:\\Gerardo\\Workspace\\Contenido\\ImgSealed\\d28ade1d-c73b-49a4-b116-090cd55bff4fQR.jpg"; // Sin QR
             System.out.println(pathfile);
@@ -674,6 +688,7 @@ public class DocumentService {
             QRCodeDetector decoder = new QRCodeDetector();
             Mat points = new Mat();
             decoder.detect(img, points);
+
             String data = decoder.detectAndDecode(img, points);
             System.out.println("Intento (0) resultado...: "+ points.empty());
             if (!points.empty() && data.length()>0) {
@@ -805,6 +820,4 @@ public class DocumentService {
             response.setStatus(400);
         }
     }
-
-
 }
