@@ -2,62 +2,45 @@ package com.document.validator.documentsmicroservice.service;
 
 import com.document.validator.documentsmicroservice.controller.dto.SingResponseDTO;
 import com.document.validator.documentsmicroservice.controller.dto.ValidateResponseDTO;
+import com.document.validator.documentsmicroservice.controller.dto.VerifyImageQrResponseDTO;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
 import com.document.validator.documentsmicroservice.repository.DocumentRepository;
-
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import com.google.zxing.*;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeReader;
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
-import nu.pattern.OpenCV;
-import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import org.apache.commons.io.FileUtils;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
-//import org.opencv.objdetect.QRCodeDetector;
-import com.google.zxing.common.HybridBinarizer;
-
-import org.opencv.objdetect.QRCodeDetector;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-
-import javax.imageio.IIOImage;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
 import javax.servlet.http.HttpServletResponse;
-import javax.swing.*;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.*;
-import java.lang.reflect.Type;
-import java.math.BigInteger;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.List;
-
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.codec.binary.Base64;
-
 import static org.opencv.imgcodecs.Imgcodecs.imread;
 import static org.opencv.imgproc.Imgproc.*;
 
@@ -194,7 +177,7 @@ public class DocumentService {
                 if(firma<0 || fin <0 ){
                     if(fileext.equals("jpg") || fileext.equals("jpeg") || fileext.equals("png") || fileext.equals("jfif") )  {
                         //Verify if exist code QR
-                        resQR= veirifyImageQR(rutaArchivoFirmado);
+                        resQR= verifiyImageQr(rutaArchivoFirmado);
                         System.out.println("Response QR:<"+resQR+"> Length:"+resQR.length());
                         if (resQR=="" || resQR.length()==0) {
                             System.out.println("Busca en miniaturas..1");
@@ -675,65 +658,31 @@ public class DocumentService {
 
         return differ;
     }
-    public static String veirifyImageQR(String pathfile) {
-        String res = "";
+
+    public String verifiyImageQr(String pathfile){
+        String data="";
         try {
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            MultipartBodyBuilder multipartBodyBuilder = new MultipartBodyBuilder();
 
+            // Load a file from disk.
+            Resource file1 = new FileSystemResource(pathfile);
+            multipartBodyBuilder.part("file", file1, MediaType.IMAGE_JPEG);
+            MultiValueMap<String, HttpEntity<?>> multipartBody = multipartBodyBuilder.build();
+            HttpEntity<MultiValueMap<String, HttpEntity<?>>> httpEntity = new HttpEntity<>(multipartBody, headers);
+            ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity("http://localhost:8083/decodeqr/verifyImageQR", httpEntity,
+                    VerifyImageQrResponseDTO.class);
 
+            System.out.println(responseEntity.getBody().getData());
+            data=responseEntity.getBody().getData();
 
-            // String pathfile = "C:\\Gerardo\\Workspace\\Contenido\\ImgSealed\\d28ade1d-c73b-49a4-b116-090cd55bff4fQR.jpg"; // Con QR
-            //pathfile = "C:\\Gerardo\\Workspace\\Contenido\\ImgSealed\\d28ade1d-c73b-49a4-b116-090cd55bff4fQR.jpg"; // Sin QR
-            System.out.println(pathfile);
-            Mat img = Imgcodecs.imread(pathfile);
-            QRCodeDetector decoder = new QRCodeDetector();
-            Mat points = new Mat();
-            decoder.detect(img, points);
-
-            String data = decoder.detectAndDecode(img, points);
-            System.out.println("Intento (0) resultado...: "+ points.empty());
-            if (!points.empty() && data.length()>0) {
-                System.out.println("QR detected... " );
-                System.out.println("Data..:" +data);
-
-                res = data;
-            } else {
-                //Intentando redimensionar para encontrar el QR
-                Mat dst = new Mat();
-                Double fac = Double.valueOf(0);
-                System.out.println("Entra a redim para buscar QR..");
-                for(double i=1; i<12; i++) {
-                    fac = (Double)(1+(i/10));
-                    System.out.print(i);
-                    Imgproc.resize(img, dst, new Size(0, 0), fac, fac, Imgproc.INTER_AREA);
-                    data = decoder.detectAndDecode(dst, points);
-                    if(!points.empty()&&data.length()>0){ //QR detected
-                        System.out.println("Data..:" +data);
-                        res=data;
-                        break;
-                    }
-                }
-                System.out.println("QR detected... "+!points.empty());
-                if (points.empty()||data.length()<1){
-                    for(double i=1; i<11; i++) {
-                        fac = (Double)(1+(i/2));
-                        System.out.print("Resize up:" +i);
-                        Imgproc.resize(img, dst, new Size(0, 0), fac, fac, Imgproc.INTER_AREA);
-                        data = decoder.detectAndDecode(dst, points);
-                        if(!points.empty()&&data.length()>0){ //QR detected
-                            System.out.println("Data..:" +data);
-                            res=data;
-                            break;
-                        }
-                    }
-                }
-                System.out.println("QR detected... "+!points.empty());
-            }
-        } catch (Exception e) {
-            System.out.println("Error in trying to open file:" + e.toString());
+        }catch(Exception e){
+            System.out.println(e.getMessage());
         }
-        return res;
+        return data;
     }
-
 
     public void download(String fileName,HttpServletResponse response){
         try {

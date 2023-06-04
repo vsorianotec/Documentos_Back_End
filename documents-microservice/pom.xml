@@ -85,27 +85,15 @@
 			<artifactId>telegrambots</artifactId>
 			<version>5.0.1</version>
 		</dependency>
-        <!-- mvn install:install-file -Dfile=/app/aipse/opencv-460.jar -DgroupId=org.opencv -DartifactId=opencv460 -Dversion=1.0.0 -Dpackaging=jar -->
 		<!-- mvn install:install-file -Dfile=/app/aipse/Imshow.jar -DgroupId=com.atul -DartifactId=JavaOpenCV -Dversion=1.0.0 -Dpackaging=jar -->
-		<!--
-                <dependency>
-                    <groupId>org.opencv</groupId>
-                    <artifactId>opencv</artifactId>
-                    <version>4.6.0</version>
-                </dependency>
-
-                <dependency>
-                    <groupId>org.opencv</groupId>
-                    <artifactId>QRDetector</artifactId>
-                    <scope>system</scope>
-                    <version>4.6.0</version>
-                    <systemPath>${basedir}\src\lib\opencv-460.jar</systemPath>
-                </dependency>
-		-->
 		<dependency>
 			<groupId>com.atul</groupId>
 			<artifactId>JavaOpenCV</artifactId>
 			<version>1.0.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.reactivestreams</groupId>
+			<artifactId>reactive-streams</artifactId>
 		</dependency>
 	</dependencies>
 	<build>
