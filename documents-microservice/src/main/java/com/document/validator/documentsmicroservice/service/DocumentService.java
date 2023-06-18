@@ -1,8 +1,8 @@
 package com.document.validator.documentsmicroservice.service;
 
-import com.document.validator.documentsmicroservice.controller.dto.SingResponseDTO;
-import com.document.validator.documentsmicroservice.controller.dto.ValidateResponseDTO;
-import com.document.validator.documentsmicroservice.controller.dto.VerifyImageQrResponseDTO;
+import com.document.validator.documentsmicroservice.dto.SingResponseDTO;
+import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
+import com.document.validator.documentsmicroservice.dto.VerifyImageQrResponseDTO;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
@@ -22,7 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
-import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;

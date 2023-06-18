@@ -1,4 +1,4 @@
-package com.document.validator.documentsmicroservice.controller.dto;
+package com.document.validator.documentsmicroservice.dto;
 
 import lombok.Data;
 

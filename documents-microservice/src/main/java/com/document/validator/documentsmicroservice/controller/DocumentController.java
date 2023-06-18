@@ -1,7 +1,7 @@
 package com.document.validator.documentsmicroservice.controller;
 
-import com.document.validator.documentsmicroservice.controller.dto.GenericResponseDTO;
-import com.document.validator.documentsmicroservice.controller.dto.ValidateResponseDTO;
+import com.document.validator.documentsmicroservice.dto.GenericResponseDTO;
+import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
 import com.document.validator.documentsmicroservice.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
