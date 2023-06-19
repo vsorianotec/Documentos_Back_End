@@ -1,6 +1,7 @@
 package com.document.validator.documentsmicroservice.service;
 
 import com.document.validator.documentsmicroservice.entity.Document;
+import com.document.validator.documentsmicroservice.entity.User;
 import com.google.gson.Gson;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -9,9 +10,9 @@ import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
-import org.opencv.core.Mat;
-import org.opencv.core.Size;
+import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.IIOImage;
@@ -23,12 +24,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import static org.opencv.imgcodecs.Imgcodecs.imread;
@@ -281,5 +285,238 @@ public class FileService {
             //manejar excepcion algorito seleccionado erroneo
         }
         return hash;//regresamos el resumen
+    }
+
+    public String getSeal(String rutaArchivoFirmado){
+        FileReader archivo = null;
+        BufferedReader br= null;
+        try {
+            // Apertura del fichero y creación de BufferedReader para poder
+            // hacer una lectura comoda (disponer del método readLine()).
+            archivo = new FileReader(rutaArchivoFirmado);
+            br= new BufferedReader(archivo);
+
+            // Lectura del fichero
+            String linea;
+            String lastLine="";
+
+            int firma = -1, fin = -1;
+
+            while((linea=br.readLine())!=null) {
+                //System.out.println(linea);
+                lastLine=linea;
+                firma = lastLine.indexOf("--AliPse");
+                fin = lastLine.indexOf("EOS--");
+                if(firma>-1){
+                    System.out.print(lastLine.substring(firma + 8));
+                    if(fin<0){
+                        lastLine=lastLine+br.readLine();
+                    }
+                    break;
+                }
+            }
+            archivo.close();
+            firma = lastLine.indexOf("--AliPse");
+            fin = lastLine.indexOf("EOS--");
+            System.out.println("Validando firma AliPse");
+            System.out.println("Firma: " + firma + " - " + fin);
+            return lastLine.substring(firma + 8, fin);
+        }catch(Exception e){
+            return "";
+        }finally{
+            // En el finally cerramos el fichero, para asegurarnos
+            // que se cierra tanto si todo va bien como si salta
+            // una excepcion.
+            try{
+                if( br != null)
+                    br.close();
+                if( archivo != null )
+                    archivo.close();
+            }catch (Exception e2){
+                e2.printStackTrace();
+            }
+        }
+    }
+
+    public double compareMinisProcess(String rutaArchivoMiniUpload, String rutaArchivoMini) throws IOException {
+        Mat imgs = new Mat();
+        Mat erodeImg = new Mat();
+        Mat dilateImg = new Mat();
+        Mat threshImg = new Mat();
+        java.util.List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+
+        Mat hierarchy = new Mat();
+
+        Imgcodecs Highgui1 = null;
+        System.out.println("Validar:"+rutaArchivoMiniUpload);
+        System.out.println("Ruta archivos minis: " +rutaArchivoMini);
+
+
+        Mat img1 = Highgui1.imread(rutaArchivoMiniUpload);
+        Mat img2 = Highgui1.imread(rutaArchivoMini);
+
+        Core.absdiff(img1, img2, imgs);
+
+        Mat kernel = Imgproc.getStructuringElement(1,new Size(4,6));
+        Mat kernel1 = Imgproc.getStructuringElement(1,new Size(2,3));
+        // corrosión
+        Imgproc.erode(imgs, erodeImg, kernel);
+        // Expansión
+        Imgproc.dilate(erodeImg, dilateImg, kernel1);
+        // detectar borde
+        Imgproc.threshold(dilateImg, threshImg, 20, 255, Imgproc.THRESH_BINARY);
+        // Convertir a escala de grises
+        Imgproc.cvtColor(threshImg, threshImg, Imgproc.COLOR_RGB2GRAY);
+        // Encuentra el esquema (3: CV_RETR_TREE, 2: CV_CHAIN_APPROX_SIMPLE)
+        Imgproc.findContours(threshImg, contours, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
+        System.out.println("Contornos diferentes: "+contours.size());
+
+        List<Rect> boundRect = new ArrayList<Rect>(contours.size());
+        String[] size = null;
+        double  areaModif = 0;
+        for(int i=0;i<contours.size();i++){
+            // Genera un rectángulo envolvente externo basado en el contorno
+            Rect rect = Imgproc.boundingRect(contours.get(i));
+            boundRect.add(rect);
+            System.out.println("Rectangle : " + rect+" Size: "+rect.size().toString());
+            size=rect.size().toString().split("x");
+            System.out.println("Lado:"+size[0]+" Alto:"+size[1]);
+            areaModif=areaModif+(Double.parseDouble(size[0]) * Double.parseDouble(size[1]));
+        }
+        System.out.println("Area modificada: "+areaModif);
+        System.out.println("Area de la imagen: "+img1.rows()*img1.cols());
+        System.out.println("% "+ (areaModif/(img1.rows()*img1.cols()))*100);
+        for(int i=0;i<contours.size();i++){
+            Scalar color = new Scalar(0,0,255);
+            // Dibujar contorno
+            //Imgproc.drawContours(img222, contours, i, color, 1, Core.LINE_8, hierarchy, 0, new Point());
+            // Dibujar rectángulo
+            Imgproc.rectangle(img2, boundRect.get(i).tl(), boundRect.get(i).br(), color, 2, Imgproc.LINE_8, 0);
+
+        }
+        // Se crea la imagen detectando la diferencia
+        //Highgui1.imwrite(uploadDir + File.separator+"tmp" +File.separator+ uuid + "_differe.jpg", img2);
+        //System.out.println("ruta dif: "+uploadDir + File.separator+"tmp" +File.separator+ uuid + "_differe.jpg");
+
+        // Highgui.imwrite(uploadDir+"\\Img\\"+description+"_diff.jpg",subtractResult);
+        // Reglas de negocio
+        double differ = (areaModif/(img1.rows()*img1.cols()))*100;
+        System.out.println(differ);
+
+        // Se borra la imagen con la diferencia
+        //Path filedifferLocation = Paths.get(uploadDir + File.separator+"tmp"+File.separator + uuid + "_differe.jpg" );
+        //Files.delete(filedifferLocation); // eliminate temp differ
+        //System.out.println("Elimina el archivo Differ 10: ");
+
+
+        return differ;
+    }
+
+    public double compareContentQR(String rutaArchivoQR, String rutaArchivoFirmado,
+                                   // String rutaArchivoDiffxx, String rutaArchivoDiffereyyy,
+                                   String rutaArchivoFakeSize,String rutaArchivoDiffereFake) throws IOException {
+
+
+        System.out.println(rutaArchivoQR + "-" + rutaArchivoFirmado);
+
+        //Metodo escala de grises
+
+        Imgcodecs Highgui = null;
+        Mat img111 = Highgui.imread(rutaArchivoQR);
+        Mat img222 = Highgui.imread(rutaArchivoFirmado);
+
+        if(img111.rows()!= img222.rows() || img111.cols()!=img222.cols()){ // Las imagenes tienen tamaños diferentes se aplica resize
+            //Mat resizeimage = new Mat();
+            Size scaleSize = new Size(img111.cols(),img111.rows());
+            resize(img222, img222, scaleSize , 0, 0, INTER_AREA);
+            // Highgui.imwrite(uploadDir+ File.separator+ "Img"+ File.separator +uuid+"_redim.jpg",img222);
+            // rutaArchivoFirmado = uploadDir+File.separator+ "Img"+ File.separator +uuid+"_redim.jpg";
+            System.out.println("Redim " +img222.size());
+        }
+
+        Mat img = new Mat();
+        // Los píxeles son pobres
+        Core.absdiff(img111, img222, img);
+        //Highgui.imwrite(rutaArchivoDiff, img);
+
+        Mat imgs = new Mat();
+        Mat erodeImg = new Mat();
+        Mat dilateImg = new Mat();
+        Mat threshImg = new Mat();
+        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+
+        Mat hierarchy = new Mat();
+        // Los píxeles son pobres
+        Core.absdiff(img111, img222, imgs);
+
+        Mat kernel = Imgproc.getStructuringElement(1,new Size(4,6));
+        Mat kernel1 = Imgproc.getStructuringElement(1,new Size(2,3));
+        // corrosión
+        Imgproc.erode(img, erodeImg, kernel);
+        // Expansión
+        Imgproc.dilate(erodeImg, dilateImg, kernel1);
+        // detectar borde
+        Imgproc.threshold(dilateImg, threshImg, 20, 255, Imgproc.THRESH_BINARY);
+        // Convertir a escala de grises
+        Imgproc.cvtColor(threshImg, threshImg, Imgproc.COLOR_RGB2GRAY);
+        // Encuentra el esquema (3: CV_RETR_TREE, 2: CV_CHAIN_APPROX_SIMPLE)
+        Imgproc.findContours(threshImg, contours, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
+        System.out.println("Contornos diferentes: "+contours.size());
+        List<Rect> boundRect = new ArrayList<Rect>(contours.size());
+        String[] size = null;
+        double  areaModif = 0;
+        for(int i=0;i<contours.size();i++){
+            // Genera un rectángulo envolvente externo basado en el contorno
+            Rect rect = Imgproc.boundingRect(contours.get(i));
+            boundRect.add(rect);
+            System.out.println("Rectangle : " + rect+" Size: "+rect.size().toString());
+            size=rect.size().toString().split("x");
+            System.out.println("Lado:"+size[0]+" Alto:"+size[1]);
+            areaModif=areaModif+(Double.parseDouble(size[0]) * Double.parseDouble(size[1]));
+        }
+        System.out.println("Area modificada: "+areaModif);
+        System.out.println("Area de la imagen: "+img111.rows()*img111.cols());
+        System.out.println("% "+ (areaModif/(img111.rows()*img111.cols()))*100);
+        for(int i=0;i<contours.size();i++){
+            Scalar color = new Scalar(0,0,255);
+            // Dibujar rectángulo
+            Imgproc.rectangle(img222, boundRect.get(i).tl(), boundRect.get(i).br(), color, 2, Imgproc.LINE_8, 0);
+
+        }
+        // Highgui.imwrite(rutaArchivoDiffere, img222);
+
+        // Reglas de negocio
+        double differ = (areaModif/(img111.rows()*img111.cols()))*100;
+        System.out.println(differ);
+
+        double alfa=0.7,beta;
+        Mat src1,src2,dst;
+
+        //src1 = Highgui.imread(rutaArchivoDiffere);
+        src1 = img222;
+        src2 = Highgui.imread(rutaArchivoFakeSize);
+
+        if( src1.empty() ) { System.out.println("Error Cargando imagen1 n");}
+        if( src2.empty() ) { System.out.println("Error Cargando imagen2 n");}
+
+        if(src1.rows()!= src2.rows() || src1.cols()!=src2.cols()){ // Las imagenes tienen tamaños diferentes se aplica resize
+            Mat resizeimage = new Mat();
+            Size scaleSize = new Size(src1.cols(),src1.rows());
+            resize(src2, src2, scaleSize , 0, 0, INTER_AREA);
+            //Highgui.imwrite(uploadDir+File.separator+"Img"+File.separator+uuid+"_redim_fake.jpg",src2);
+            //rutaArchivoFirmado = uploadDir+File.separator+"Img"+File.separator+uuid+"_redim_fake.jpg";
+            System.out.println("Redim " +src2.size());
+        }
+        dst = new Mat();
+        beta = 1.0 - alfa;
+        Core.addWeighted(src1, alfa, src2, beta, 0.0, dst);
+        Highgui.imwrite(rutaArchivoDiffereFake , dst);
+
+        //Files.delete(Paths.get(rutaArchivoDiffere )); // eliminate temp differe
+        //Files.delete(Paths.get(rutaArchivoDiff)); // eliminate temp differ
+
+
+
+        return differ;
     }
 }
