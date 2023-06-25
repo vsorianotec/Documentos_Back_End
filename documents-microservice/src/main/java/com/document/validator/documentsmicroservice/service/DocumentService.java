@@ -55,6 +55,9 @@ public class DocumentService {
     private double acceptancePercentage;
     @Value("${app.similarityPercentage}")
     private double similarityPercentage;
+    @Value("${app.microservice.domain}")
+    private String domain;
+
 
     Logger logger = LogManager.getLogger(getClass());
 
@@ -350,7 +353,7 @@ public class DocumentService {
             multipartBodyBuilder.part("file", file1, MediaType.IMAGE_JPEG);
             MultiValueMap<String, HttpEntity<?>> multipartBody = multipartBodyBuilder.build();
             HttpEntity<MultiValueMap<String, HttpEntity<?>>> httpEntity = new HttpEntity<>(multipartBody, headers);
-            ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity("http://localhost:8083/decodeqr/verifyImageQR", httpEntity,
+            ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity(domain + "decodeqr/verifyImageQR", httpEntity,
                     VerifyImageQrResponseDTO.class);
 
             logger.info(responseEntity.getBody().getData());
