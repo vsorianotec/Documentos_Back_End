@@ -8,7 +8,7 @@ java -cp "MyJar.jar;lib/*"
 "C:\Program Files\Java\jdk1.8.0_202\bin\java" -jar documents-microservice-1.0.0.jar
 
 
-"C:\Program Files\Java\jdk1.8.0_202\bin\java" -Djava.library.path=c:\\app\\aipse -jar decodeqr-microservice-1.0.jar
+"C:\Program Files\Java\jdk1.8.0_202\bin\java" -Djava.library.path=c:\\app\\aipse\\lib -jar decodeqr-microservice-1.0.jar
 
 "C:\Program Files\Java\jdk1.8.0_202\bin\java" -jar decodeqr-microservice-1.0.jar
 
