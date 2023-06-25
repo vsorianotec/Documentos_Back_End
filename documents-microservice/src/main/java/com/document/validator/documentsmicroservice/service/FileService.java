@@ -1,7 +1,6 @@
 package com.document.validator.documentsmicroservice.service;
 
 import com.document.validator.documentsmicroservice.entity.Document;
-import com.document.validator.documentsmicroservice.entity.User;
 import com.google.gson.Gson;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -10,11 +9,13 @@ import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -24,7 +25,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,7 +41,11 @@ import static org.opencv.imgproc.Imgproc.resize;
 
 @Service
 public class FileService {
-    public static String rutaqr = "C:\\Temporal\\QR";
+
+    @Value("${app.workdir}")
+    public String workdir;
+
+    Logger logger = LogManager.getLogger(getClass());
 
     public String changeFileExtension(String filExtension){
         switch (filExtension){
@@ -84,9 +88,9 @@ public class FileService {
             os.close();
             ios.close();
             writer.dispose();
-            System.out.println("Se aplico compresión 0.99f");
+            logger.info("Se aplico compresión 0.99f");
         }catch (IOException e){
-            System.out.println("Error en la compresión de imagenes");
+            logger.info("Error en la compresión de imagenes");
             throw e;
         }
     }
@@ -98,7 +102,7 @@ public class FileService {
         Size scaleSize = new Size(200,100);
         resize(src, resizeimage, scaleSize , 0, 0, INTER_AREA);
         Imgcodecs.imwrite(outputImagePath , resizeimage);
-        System.out.println("Generated little image");
+        logger.info("Generated little image");
     }
 
     public Integer getSizemaxImage(String inputImagePath){
@@ -112,16 +116,16 @@ public class FileService {
                     + "|" + document.getHashOriginalDocument()
                     + "|" + document.getCreatedDate()
                     + "|" + document.getCreatedBy();
-            String qrCodePath = rutaqr + File.separator + document.getUuid() + "_CodeQR.jpg";
+            String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
             Integer sizemax = getSizemaxImage(inputImagePath);
             generateQR(signature, qrCodePath, sizemax);
             combineImageAndQR(inputImagePath,qrCodePath,outputImagePath);
 
             Path fileQRLocation = Paths.get(qrCodePath);
             Files.delete(fileQRLocation);
-            System.out.println("Imagen Sellada ");
+            logger.info("Imagen Sellada ");
         }catch (Exception e){
-            System.out.println("Error en el sellado de la Imagen");
+            logger.info("Error en el sellado de la Imagen");
             throw e;
         }
     }
@@ -131,7 +135,7 @@ public class FileService {
         Gson gson = new Gson();
         //String selloAlipse = "--AliPse" + Base64.encodeBase64(gson.toJson(document)) + "EOS--";
         String selloAlipse = "--AliPse" + gson.toJson(document) + "EOS--";
-        System.out.println("selloAlipse: " + selloAlipse);
+        logger.info("selloAlipse: " + selloAlipse);
 
         // Se abre el fichero original para lectura
         FileInputStream fileInput = new FileInputStream(inputImagePath);
@@ -181,14 +185,14 @@ public class FileService {
             ////
             Mat resizeimage;
 
-            Mat src  =  imread(rutaqr + File.separator +"logo.jpg");
+            Mat src  =  imread(workdir + File.separator + "lib" + File.separator +"logo.jpg");
             resizeimage = new Mat();
             Size scaleSize = new Size(30,30);
             resize(src, resizeimage, scaleSize , 0, 0, INTER_AREA);
-            Imgcodecs.imwrite(rutaqr + File.separator +"logo30x30.jpg", resizeimage);
+            Imgcodecs.imwrite(workdir + File.separator + "lib" + File.separator +"logo30x30.jpg", resizeimage);
 
             BufferedImage background1 = ImageIO.read(new File(qrCodePath));
-            BufferedImage foreground1 = ImageIO.read(new File(rutaqr + File.separator + "logo30x30.jpg"));
+            BufferedImage foreground1 = ImageIO.read(new File(workdir + File.separator + "lib" + File.separator + "logo30x30.jpg"));
 
             BufferedImage bufferedImage1 = new BufferedImage(background1.getWidth(),background1.getHeight(),BufferedImage.TYPE_INT_RGB);
             Graphics2D g2d1 = bufferedImage1.createGraphics();
@@ -201,7 +205,7 @@ public class FileService {
             g2d1.dispose();
             ImageIO.write(bufferedImage1,"JPEG", new File(qrCodePath));
         }catch (Exception e){
-            System.out.println("Error en la generación del código QR");
+            logger.info("Error en la generación del código QR");
             throw e;
         }
     }
@@ -211,13 +215,13 @@ public class FileService {
 
             File outputfile = new File(outputImagePath);
 
-            System.out.println("Open images to convinated");
+            logger.info("Open images to convinated");
             BufferedImage background = ImageIO.read(new File(inputImagePath));
-            System.out.println("Ruta archivo para QR :"+inputImagePath);
-            System.out.println("Foreground: "+ qrCodePath);
+            logger.info("Ruta archivo para QR :"+inputImagePath);
+            logger.info("Foreground: "+ qrCodePath);
             BufferedImage foreground = ImageIO.read(new File(qrCodePath));
 
-            System.out.println("Convining images.. ");
+            logger.info("Convining images.. ");
             BufferedImage bufferedImage = new BufferedImage(background.getWidth(),background.getHeight(),BufferedImage.TYPE_INT_RGB);
             Graphics2D g2d = bufferedImage.createGraphics();
 
@@ -234,7 +238,7 @@ public class FileService {
             ImageIO.write(bufferedImage,"JPEG",  outputfile);
 
         } catch (IOException e) {
-            System.out.println("Error en la combinación de la Imagen y el QR");
+            logger.info("Error en la combinación de la Imagen y el QR");
             throw e;
         }
     }
@@ -303,7 +307,7 @@ public class FileService {
             int firma = -1, fin = -1;
 
             while((linea=br.readLine())!=null) {
-                //System.out.println(linea);
+                //logger.info(linea);
                 lastLine=linea;
                 firma = lastLine.indexOf("--AliPse");
                 fin = lastLine.indexOf("EOS--");
@@ -318,8 +322,8 @@ public class FileService {
             archivo.close();
             firma = lastLine.indexOf("--AliPse");
             fin = lastLine.indexOf("EOS--");
-            System.out.println("Validando firma AliPse");
-            System.out.println("Firma: " + firma + " - " + fin);
+            logger.info("Validando firma AliPse");
+            logger.info("Firma: " + firma + " - " + fin);
             return lastLine.substring(firma + 8, fin);
         }catch(Exception e){
             return "";
@@ -348,8 +352,8 @@ public class FileService {
         Mat hierarchy = new Mat();
 
         Imgcodecs Highgui1 = null;
-        System.out.println("Validar:"+rutaArchivoMiniUpload);
-        System.out.println("Ruta archivos minis: " +rutaArchivoMini);
+        logger.info("Validar:"+rutaArchivoMiniUpload);
+        logger.info("Ruta archivos minis: " +rutaArchivoMini);
 
 
         Mat img1 = Highgui1.imread(rutaArchivoMiniUpload);
@@ -369,7 +373,7 @@ public class FileService {
         Imgproc.cvtColor(threshImg, threshImg, Imgproc.COLOR_RGB2GRAY);
         // Encuentra el esquema (3: CV_RETR_TREE, 2: CV_CHAIN_APPROX_SIMPLE)
         Imgproc.findContours(threshImg, contours, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
-        System.out.println("Contornos diferentes: "+contours.size());
+        logger.info("Contornos diferentes: "+contours.size());
 
         List<Rect> boundRect = new ArrayList<Rect>(contours.size());
         String[] size = null;
@@ -378,14 +382,14 @@ public class FileService {
             // Genera un rectángulo envolvente externo basado en el contorno
             Rect rect = Imgproc.boundingRect(contours.get(i));
             boundRect.add(rect);
-            System.out.println("Rectangle : " + rect+" Size: "+rect.size().toString());
+            logger.info("Rectangle : " + rect+" Size: "+rect.size().toString());
             size=rect.size().toString().split("x");
-            System.out.println("Lado:"+size[0]+" Alto:"+size[1]);
+            logger.info("Lado:"+size[0]+" Alto:"+size[1]);
             areaModif=areaModif+(Double.parseDouble(size[0]) * Double.parseDouble(size[1]));
         }
-        System.out.println("Area modificada: "+areaModif);
-        System.out.println("Area de la imagen: "+img1.rows()*img1.cols());
-        System.out.println("% "+ (areaModif/(img1.rows()*img1.cols()))*100);
+        logger.info("Area modificada: "+areaModif);
+        logger.info("Area de la imagen: "+img1.rows()*img1.cols());
+        logger.info("% "+ (areaModif/(img1.rows()*img1.cols()))*100);
         for(int i=0;i<contours.size();i++){
             Scalar color = new Scalar(0,0,255);
             // Dibujar contorno
@@ -394,44 +398,38 @@ public class FileService {
             Imgproc.rectangle(img2, boundRect.get(i).tl(), boundRect.get(i).br(), color, 2, Imgproc.LINE_8, 0);
 
         }
-        // Se crea la imagen detectando la diferencia
-        //Highgui1.imwrite(uploadDir + File.separator+"tmp" +File.separator+ uuid + "_differe.jpg", img2);
-        //System.out.println("ruta dif: "+uploadDir + File.separator+"tmp" +File.separator+ uuid + "_differe.jpg");
 
-        // Highgui.imwrite(uploadDir+"\\Img\\"+description+"_diff.jpg",subtractResult);
         // Reglas de negocio
         double differ = (areaModif/(img1.rows()*img1.cols()))*100;
-        System.out.println(differ);
+        logger.info(differ);
 
         // Se borra la imagen con la diferencia
         //Path filedifferLocation = Paths.get(uploadDir + File.separator+"tmp"+File.separator + uuid + "_differe.jpg" );
         //Files.delete(filedifferLocation); // eliminate temp differ
-        //System.out.println("Elimina el archivo Differ 10: ");
+        //logger.info("Elimina el archivo Differ 10: ");
 
 
         return differ;
     }
 
-    public double compareContentQR(String rutaArchivoQR, String rutaArchivoFirmado,
-                                   // String rutaArchivoDiffxx, String rutaArchivoDiffereyyy,
-                                   String rutaArchivoFakeSize,String rutaArchivoDiffereFake) throws IOException {
+    public double compareContentImage(String rutaArchivo, String rutaArchivoFirmado,
+                                      String rutaArchivoFakeSize, String rutaArchivoDiffereFake) throws IOException {
 
 
-        System.out.println(rutaArchivoQR + "-" + rutaArchivoFirmado);
+        logger.info("rutaArchivo -" + rutaArchivo);
+        logger.info(rutaArchivoFirmado + "-" + rutaArchivoFirmado);
 
         //Metodo escala de grises
 
         Imgcodecs Highgui = null;
-        Mat img111 = Highgui.imread(rutaArchivoQR);
+        Mat img111 = Highgui.imread(rutaArchivo);
         Mat img222 = Highgui.imread(rutaArchivoFirmado);
 
         if(img111.rows()!= img222.rows() || img111.cols()!=img222.cols()){ // Las imagenes tienen tamaños diferentes se aplica resize
             //Mat resizeimage = new Mat();
             Size scaleSize = new Size(img111.cols(),img111.rows());
             resize(img222, img222, scaleSize , 0, 0, INTER_AREA);
-            // Highgui.imwrite(uploadDir+ File.separator+ "Img"+ File.separator +uuid+"_redim.jpg",img222);
-            // rutaArchivoFirmado = uploadDir+File.separator+ "Img"+ File.separator +uuid+"_redim.jpg";
-            System.out.println("Redim " +img222.size());
+            logger.info("Redim " +img222.size());
         }
 
         Mat img = new Mat();
@@ -461,7 +459,7 @@ public class FileService {
         Imgproc.cvtColor(threshImg, threshImg, Imgproc.COLOR_RGB2GRAY);
         // Encuentra el esquema (3: CV_RETR_TREE, 2: CV_CHAIN_APPROX_SIMPLE)
         Imgproc.findContours(threshImg, contours, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
-        System.out.println("Contornos diferentes: "+contours.size());
+        logger.info("Contornos diferentes: "+contours.size());
         List<Rect> boundRect = new ArrayList<Rect>(contours.size());
         String[] size = null;
         double  areaModif = 0;
@@ -469,14 +467,14 @@ public class FileService {
             // Genera un rectángulo envolvente externo basado en el contorno
             Rect rect = Imgproc.boundingRect(contours.get(i));
             boundRect.add(rect);
-            System.out.println("Rectangle : " + rect+" Size: "+rect.size().toString());
+            logger.info("Rectangle : " + rect+" Size: "+rect.size().toString());
             size=rect.size().toString().split("x");
-            System.out.println("Lado:"+size[0]+" Alto:"+size[1]);
+            logger.info("Lado:"+size[0]+" Alto:"+size[1]);
             areaModif=areaModif+(Double.parseDouble(size[0]) * Double.parseDouble(size[1]));
         }
-        System.out.println("Area modificada: "+areaModif);
-        System.out.println("Area de la imagen: "+img111.rows()*img111.cols());
-        System.out.println("% "+ (areaModif/(img111.rows()*img111.cols()))*100);
+        logger.info("Area modificada: "+areaModif);
+        logger.info("Area de la imagen: "+img111.rows()*img111.cols());
+        logger.info("% "+ (areaModif/(img111.rows()*img111.cols()))*100);
         for(int i=0;i<contours.size();i++){
             Scalar color = new Scalar(0,0,255);
             // Dibujar rectángulo
@@ -487,7 +485,7 @@ public class FileService {
 
         // Reglas de negocio
         double differ = (areaModif/(img111.rows()*img111.cols()))*100;
-        System.out.println(differ);
+        logger.info(differ);
 
         double alfa=0.7,beta;
         Mat src1,src2,dst;
@@ -496,26 +494,18 @@ public class FileService {
         src1 = img222;
         src2 = Highgui.imread(rutaArchivoFakeSize);
 
-        if( src1.empty() ) { System.out.println("Error Cargando imagen1 n");}
-        if( src2.empty() ) { System.out.println("Error Cargando imagen2 n");}
+        if( src1.empty() ) { logger.info("Error Cargando imagen1 n");}
+        if( src2.empty() ) { logger.info("Error Cargando imagen2 n");}
 
         if(src1.rows()!= src2.rows() || src1.cols()!=src2.cols()){ // Las imagenes tienen tamaños diferentes se aplica resize
-            Mat resizeimage = new Mat();
             Size scaleSize = new Size(src1.cols(),src1.rows());
             resize(src2, src2, scaleSize , 0, 0, INTER_AREA);
-            //Highgui.imwrite(uploadDir+File.separator+"Img"+File.separator+uuid+"_redim_fake.jpg",src2);
-            //rutaArchivoFirmado = uploadDir+File.separator+"Img"+File.separator+uuid+"_redim_fake.jpg";
-            System.out.println("Redim " +src2.size());
+            logger.info("Redim " +src2.size());
         }
         dst = new Mat();
         beta = 1.0 - alfa;
         Core.addWeighted(src1, alfa, src2, beta, 0.0, dst);
         Highgui.imwrite(rutaArchivoDiffereFake , dst);
-
-        //Files.delete(Paths.get(rutaArchivoDiffere )); // eliminate temp differe
-        //Files.delete(Paths.get(rutaArchivoDiff)); // eliminate temp differ
-
-
 
         return differ;
     }

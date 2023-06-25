@@ -1,6 +1,8 @@
 package com.document.validator.authenticationmicroservice.utils;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Component;
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
@@ -16,6 +18,8 @@ public class CriptographySimuladorHsm {
     private String algoritmo= "AES";
     private int keysize=16;
 
+    Logger logger = LogManager.getLogger(getClass());
+
     public void addKey(String valor){
 
         byte[] valorByte = valor.getBytes();
@@ -24,8 +28,7 @@ public class CriptographySimuladorHsm {
     }
 
     public CriptographySimuladorHsm(){
-
-        System.out.println("Entro a encriptar");
+        logger.debug("Entro a encriptar");
         addKey("67890234234d");
     }
 
@@ -43,15 +46,15 @@ public class CriptographySimuladorHsm {
             valorEncriptado = new String(new Base64(true).encode(cipherByte));
 
         }catch (NoSuchAlgorithmException ex) {
-            System.err.println( ex.getMessage() );
+            logger.error( ex.getMessage() );
         } catch (NoSuchPaddingException ex) {
-            System.err.println( ex.getMessage() );
+            logger.error( ex.getMessage() );
         } catch (InvalidKeyException ex) {
-            System.err.println( ex.getMessage() );
+            logger.error( ex.getMessage() );
         } catch (IllegalBlockSizeException ex) {
-            System.err.println( ex.getMessage() );
+            logger.error( ex.getMessage() );
         } catch (BadPaddingException ex) {
-            System.err.println( ex.getMessage() );
+            logger.error( ex.getMessage() );
         }
 
         valorEncriptado = valorEncriptado.replace("+","0").replace("=","1").replace("*", "2").replace("/", "3");

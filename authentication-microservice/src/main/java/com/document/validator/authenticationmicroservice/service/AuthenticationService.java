@@ -5,6 +5,8 @@ import com.document.validator.authenticationmicroservice.dto.LogonResponseDTO;
 import com.document.validator.authenticationmicroservice.entity.User;
 import com.document.validator.authenticationmicroservice.repository.UserRepository;
 import com.document.validator.authenticationmicroservice.utils.CriptographySimuladorHsm;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,8 @@ public class AuthenticationService {
     @Autowired
     CriptographySimuladorHsm cripto;
 
+    Logger logger = LogManager.getLogger(getClass());
+
     public LogonResponseDTO logon(LogonRequestDTO request){
         LogonResponseDTO response=new LogonResponseDTO();
         User user=userRepository.findByEmail(request.getEmail());
@@ -28,6 +32,7 @@ public class AuthenticationService {
         }
 
         if(user.getPassword().equals(cripto.encriptar(request.getPassword()))){
+            user.setPassword(null);
             response.setUser(user);
             response.setStatus(0);
             response.setCodeError("AUTH000");

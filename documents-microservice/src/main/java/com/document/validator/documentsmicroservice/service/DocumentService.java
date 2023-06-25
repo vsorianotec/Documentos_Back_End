@@ -9,9 +9,11 @@ import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
 import com.document.validator.documentsmicroservice.repository.DocumentRepository;
 import com.google.gson.Gson;
-import org.apache.commons.io.FileUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opencv.core.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
@@ -47,28 +49,27 @@ public class DocumentService {
     @Autowired
     FileService fileService;
 
-    public static String uploadDir = "C:\\Temporal";
-    public static String uuid;
-    private static String fileext;
-    private static double acceptancePercentage = 99.69;
-    private static double similarityPercentage = 98.9;
+    @Value("${app.workdir}")
+    public String workdir;
+    @Value("${app.acceptancePercentage}")
+    private double acceptancePercentage;
+    @Value("${app.similarityPercentage}")
+    private double similarityPercentage;
 
+    Logger logger = LogManager.getLogger(getClass());
 
     public SingResponseDTO sign(MultipartFile file, String description, int userId){
         SingResponseDTO responseDTO=new SingResponseDTO();
         try {
+            logger.info("Started sign:"+LocalDateTime.now());
+            logger.info("OpenCV Version: " + Core.VERSION);
 
-            System.out.println("OpenCV Version: " + Core.VERSION);
-            System.out.println("|Sign|Ini."+LocalDateTime.now());
-
-            uuid = UUID.randomUUID().toString();
-
-            fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
-
-            String fileName= uuid + "."+ fileext; //FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
-            String rutaArchivoFirmado= uploadDir + File.separator + "ImgSealed" + File.separator + fileName;
-            String rutaArchivoOriginal=uploadDir + File.separator + "Img" + File.separator + file.getOriginalFilename();
-            String rutaArchivoOriginalCompress= uploadDir + File.separator + "Img"+ File.separator + "c_"+file.getOriginalFilename();
+            String uuid = UUID.randomUUID().toString();
+            String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
+            String fileName= uuid + "."+ fileext;
+            String rutaArchivoFirmado= workdir + File.separator + "FilesSealed" + File.separator + fileName;
+            String rutaArchivoOriginal= workdir + File.separator + "Files" + File.separator + file.getOriginalFilename();
+            String rutaArchivoOriginalCompress= workdir + File.separator + "Files"+ File.separator + "c_"+file.getOriginalFilename();
 
             Path copyLocation = Paths.get(rutaArchivoFirmado);
             Path copyLocationOri = Paths.get(rutaArchivoOriginal);
@@ -86,7 +87,7 @@ public class DocumentService {
 
             if(fileService.isStaticImage(fileext)){
                 fileService.generateCompressImage(rutaArchivoOriginal,rutaArchivoOriginalCompress);
-                fileService.generateThumbnail(rutaArchivoOriginal,uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+uuid+".jpg");
+                fileService.generateThumbnail(rutaArchivoOriginal, workdir + File.separator + "min"+ File.separator+"m_"+uuid+".jpg");
                 fileService.sealImage(rutaArchivoOriginal,rutaArchivoFirmado,document);
             }else {
                 fileService.sealFile(rutaArchivoOriginal,rutaArchivoFirmado,document);
@@ -104,7 +105,7 @@ public class DocumentService {
             responseDTO.setCodeError("INTERNAL");
             responseDTO.setMsgError("No se pudo guardar el archivo " + file.getOriginalFilename() + ". ¡Prueba Nuevamente!.  Exception: " + e.getMessage());
         }
-        System.out.println("|Sign|Fin."+LocalDateTime.now());
+        logger.info("Finish Sign:"+LocalDateTime.now());
         return responseDTO;
     }
 
@@ -114,22 +115,21 @@ public class DocumentService {
         Path copyLocation = null;
 
         try {
-            System.out.println("|validate|Ini."+LocalDateTime.now());
+            logger.info("Started validate:"+LocalDateTime.now());
+
             String uuid = UUID.randomUUID().toString();
             String fileName= uuid + "."+ FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
-            String rutaArchivoFirmado= uploadDir + File.separator + "tmp"+File.separator+"Sellado"+fileName;
+            String rutaArchivoFirmado= workdir + File.separator + "tmp"+File.separator+"Sellado"+fileName;
             copyLocation = Paths.get(rutaArchivoFirmado);
             Files.copy(file.getInputStream(), copyLocation, StandardCopyOption.REPLACE_EXISTING);
-            fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
-            System.out.println(fileext);
+            String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
 
             String seal="";
             Document document  = new Document();
             if(fileService.isStaticImage(fileext)){
                 seal= verifiyImageQr(rutaArchivoFirmado);
-                System.out.println("Response QR:<"+seal+"> Length:"+seal.length());
+                logger.info("Response QR: "+seal);
                 if (!seal.equals("")) { // Exists QR
-                    System.out.println("QR=<"+seal+">");
                     String[] parts = seal.split("\\|"); //Result convert in matrix and set in document object
                     if(parts.length>0) {
                         document.setId(Integer.parseInt(parts[0]));
@@ -138,19 +138,17 @@ public class DocumentService {
                     }
                     Document documentBD = documentRepository.findById(document.getId()).orElse(null);
                     if (documentBD!=null ) {
-                        System.out.println("<4>Find with OpenCV . "+ LocalDateTime.now());
-                        System.out.println("Begin comparing...");
-                        String rutaArchivoQR = uploadDir +File.separator +"ImgSealed"+File.separator+documentBD.getUuid() + ".jpg";
-                        // String rutaArchivoDiff= uploadDir +File.separator+"tmp"+File.separator+uuid+"_diff.jpg";
-                        // String rutaArchivoDiffere = uploadDir + File.separator+"tmp" +File.separator+ uuid + "_differe.jpg";
-                        String rutaArchivoFakeSize = uploadDir+File.separator+"tmp"+File.separator+"fake_size.jpg";
-                        String rutaArchivoDiffereFake = uploadDir + File.separator+"tmp"+File.separator+ uuid + "_differeFake.jpg";
-                        double resCompare= fileService.compareContentQR(rutaArchivoQR,rutaArchivoFirmado,rutaArchivoFakeSize,rutaArchivoDiffereFake);
+                        logger.info("<4>Find with OpenCV . "+ LocalDateTime.now());
+                        logger.info("Begin comparing...");
+                        String rutaArchivoQR = workdir +File.separator +"FilesSealed"+File.separator+documentBD.getUuid() + ".jpg";
+                        String rutaArchivoFakeSize = workdir +File.separator+"lib"+File.separator+"fake_size.jpg";
+                        String rutaArchivoDiffereFake = workdir + File.separator+"tmp"+File.separator+ uuid + "_differeFake.jpg";
+                        double resCompare= fileService.compareContentImage(rutaArchivoQR,rutaArchivoFirmado,rutaArchivoFakeSize,rutaArchivoDiffereFake);
                         double matchPorcentage=100 - resCompare;
-                        System.out.println("matchPorcentage: " + matchPorcentage);
-                        if(matchPorcentage>99.99){
+                        logger.info("matchPorcentage: " + matchPorcentage);
+                        if(matchPorcentage>acceptancePercentage){
                             User user = userRepository.getReferenceById(documentBD.getCreatedBy());
-                            System.out.println("File signed: "+rutaArchivoFirmado);
+                            logger.info("File signed: "+rutaArchivoFirmado);
 
                             responseDTO.setStatus(0);
                             responseDTO.setCodeError("DOCU000");
@@ -160,15 +158,15 @@ public class DocumentService {
                             responseDTO.setOriginalName(documentBD.getFileName());
                             responseDTO.setAuthor(user.getName());
                             responseDTO.setEmail(user.getEmail());
-                            System.out.println("|Val|ConQROK."+LocalDateTime.now());
+                            logger.info("|Val|ConQROK."+LocalDateTime.now());
                             // 2% umbral corrección
-                        } else if (matchPorcentage>98) {
+                        } else if (matchPorcentage>similarityPercentage) {
                             responseDTO.setStatus(1);
                             responseDTO.setCodeError("DOCU004");
                             responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\none of the images in our database by [author] (please be warned it’s not identical) "); //El documento contiene una firma no reconocida
                             responseDTO.setFileName(uuid + "_differeFake.jpg");
 
-                            System.out.println("|Val|SinQRcomparingFinFake."+LocalDateTime.now());
+                            logger.info("|Val|SinQRcomparingFinFake."+LocalDateTime.now());
                             return responseDTO;
                         } else {
                             responseDTO.setStatus(1);
@@ -176,7 +174,7 @@ public class DocumentService {
                             responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity"); //El documento contiene una firma no reconocida
                             responseDTO.setFileName(uuid + "_differeFake.jpg");
 
-                            System.out.println("|Val|SinQRComparingNotSaledFinFake."+LocalDateTime.now());
+                            logger.info("|Val|SinQRComparingNotSaledFinFake."+LocalDateTime.now());
                             return responseDTO;
                         }
                     }else{
@@ -185,15 +183,24 @@ public class DocumentService {
                         responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation");
                         responseDTO.setFileName("fake.jpg");
 
-                        System.out.println("|Val|SinQRNotSaledFinFake."+LocalDateTime.now());
+                        logger.info("|Val|SinQRNotSaledFinFake."+LocalDateTime.now());
                         return responseDTO;
                     }
                 }else{
-                    String rutaMiniatura= uploadDir + File.separator + "Miniaturas"+ File.separator+"mtmp_"+fileName;
+                    String rutaMiniatura= workdir + File.separator + "min"+ File.separator+"mtmp_"+fileName;
                     fileService.generateThumbnail(rutaArchivoFirmado,rutaMiniatura);
                     CompareMinisResponseDTO compareMinisResponseDTO = compareMinis(rutaMiniatura);
                     Files.delete(Paths.get(rutaMiniatura));
-                    if(compareMinisResponseDTO.getMatchPercentage()>=acceptancePercentage){
+                    double matchPorcentage=compareMinisResponseDTO.getMatchPercentage();
+                    String rutaArchivoDiffereFake=null;
+                    if(compareMinisResponseDTO.getMatchPercentage()>=acceptancePercentage) {
+                        String rutaArchivo = workdir + File.separator + "files" + File.separator + compareMinisResponseDTO.getDocument().getFileName();
+                        String rutaArchivoFakeSize = workdir + File.separator + "lib" + File.separator + "fake_size.jpg";
+                        rutaArchivoDiffereFake = workdir + File.separator + "tmp" + File.separator + uuid + "_differeFake.jpg";
+                        double resCompare = fileService.compareContentImage(rutaArchivo, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
+                        matchPorcentage = 100 - resCompare;
+                    }
+                    if(matchPorcentage>=acceptancePercentage){
                         responseDTO.setDocumentId(compareMinisResponseDTO.getDocument().getId());
                         responseDTO.setCreatedDate(compareMinisResponseDTO.getDocument().getCreatedDate());
                         responseDTO.setOriginalName(compareMinisResponseDTO.getDocument().getFileName());
@@ -204,15 +211,15 @@ public class DocumentService {
                         responseDTO.setCodeError("DOCU000");
                         responseDTO.setMsgError("OK");
 
-                        System.out.println("|Val|FinMiniOK."+LocalDateTime.now());
+                        logger.info("|Val|FinMiniOK."+LocalDateTime.now());
                         return responseDTO;
-                    } else if (compareMinisResponseDTO.getMatchPercentage()>similarityPercentage) {
+                    } else if (matchPorcentage>similarityPercentage) {
                         responseDTO.setStatus(1);
                         responseDTO.setCodeError("DOCU004");
                         responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)"); //El documento contiene una firma no reconocida
-                        responseDTO.setFileName("fake.jpg");
+                        responseDTO.setFileName(uuid + "_differeFake.jpg");
 
-                        System.out.println("|Val|FinMiniLike."+LocalDateTime.now());
+                        logger.info("|Val|FinMiniLike."+LocalDateTime.now());
                         return responseDTO;
                     } else {
                         responseDTO.setStatus(1);
@@ -220,16 +227,16 @@ public class DocumentService {
                         responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation"); //El documento contiene una firma no reconocida
                         responseDTO.setFileName("fake.jpg");
 
-                        System.out.println("|Val|FinMiniFake."+LocalDateTime.now());
+                        logger.info("|Val|FinMiniFake."+LocalDateTime.now());
                         return responseDTO;
                     }
                 }
             }else{
                 seal=fileService.getSeal(rutaArchivoFirmado);
                 if(!seal.equals("")){
-                    System.out.println("json: " + seal);
+                    logger.info("json: " + seal);
                     //byte[] decodedBytes = Base64.decodeBase64(seal);
-                    //System.out.println("decodedBytes " + new String(decodedBytes));
+                    //logger.info("decodedBytes " + new String(decodedBytes));
                     //json=decodedBytes.toString();
                     document = gson.fromJson(seal, Document.class);
                     Document documentBD = documentRepository.findById(document.getId()).orElse(null);
@@ -239,11 +246,11 @@ public class DocumentService {
                         responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)");
                         responseDTO.setFileName("fake.jpg");
 
-                        System.out.println("|Val|SinQRFinFake."+LocalDateTime.now());
+                        logger.info("|Val|SinQRFinFake."+LocalDateTime.now());
                         return responseDTO;
                     }else{
                         User user = userRepository.getReferenceById(documentBD.getCreatedBy());
-                        System.out.println("File signed: "+rutaArchivoFirmado);
+                        logger.info("File signed: "+rutaArchivoFirmado);
 
                         responseDTO.setStatus(0);
                         responseDTO.setCodeError("DOCU000");
@@ -253,7 +260,7 @@ public class DocumentService {
                         responseDTO.setOriginalName(documentBD.getFileName());
                         responseDTO.setAuthor(user.getName());
                         responseDTO.setEmail(user.getEmail());
-                        System.out.println("|Val|SinQROK."+LocalDateTime.now());
+                        logger.info("|Val|SinQROK."+LocalDateTime.now());
                     }
                 }else{
                     responseDTO.setStatus(1);
@@ -261,7 +268,7 @@ public class DocumentService {
                     responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation");
                     responseDTO.setFileName("fake.jpg");
 
-                    System.out.println("|Val|FinSinQRFake."+LocalDateTime.now());
+                    logger.info("|Val|FinSinQRFake."+LocalDateTime.now());
                     return responseDTO;
                 }
 
@@ -276,58 +283,50 @@ public class DocumentService {
                 try {
                     Files.delete(copyLocation);
                 }catch (Exception e){
-                    System.out.println("Error al eliminar archivo de trabajo");
+                    logger.info("Error al eliminar archivo de trabajo");
                 }
             }
         }
-        System.out.println("|validate|FinOK."+LocalDateTime.now());
+        logger.info("|validate|FinOK."+LocalDateTime.now());
         return responseDTO;
     }
 
     private CompareMinisResponseDTO compareMinis(String rutaArchivoMiniUpload) throws IOException {
-        System.out.println("Count repository: "+documentRepository.count());
+        logger.info("Count repository: "+documentRepository.count());
         List<Document> documents = documentRepository.findAll();
         String rutaArchivoMini = "";
         Double minorDifference = 200.0,difference=200.0;
         Document documentBestMach = null;
         for(Document document : documents){
-            rutaArchivoMini = uploadDir + File.separator + "Miniaturas"+ File.separator+"m_"+document.getUuid()+".jpg";
+            rutaArchivoMini = workdir + File.separator + "min"+ File.separator+"m_"+document.getUuid()+".jpg";
             System.out.print("Validando existencia: "+rutaArchivoMini);
             File fileMiniInBD = new File(rutaArchivoMini);
             // Checking if the specified file exists or not
             if (fileMiniInBD.exists()) {
-                System.out.println(" Exists");
+                logger.info(" Exists");
                 difference = fileService.compareMinisProcess(rutaArchivoMiniUpload,rutaArchivoMini);
             }else{
-                System.out.println(" Does not Exists");
+                logger.info(" Does not Exists");
             }
-            System.out.println("difference: "+difference);
-            System.out.println("minorDifference: "+minorDifference);
+            logger.info("difference: "+difference);
+            logger.info("minorDifference: "+minorDifference);
             if(difference<minorDifference){
                 minorDifference = difference;
                 documentBestMach=document;
-                System.out.println("Menor diferencia ... : "+minorDifference);
+                logger.info("Menor diferencia ... : "+minorDifference);
             }
         }
         double bestMatch = 100 - minorDifference;
-        System.out.println("Mejor coincidencia: "+bestMatch);
+        logger.info("Mejor coincidencia: "+bestMatch);
         CompareMinisResponseDTO response = new CompareMinisResponseDTO();
 
         if(bestMatch> acceptancePercentage ){
-            System.out.println("Document of best match: " + documentBestMach);
-            User author = userRepository.findById(documentBestMach.getId()).orElse(null);;
+            logger.info("Document of best match: " + documentBestMach);
+            User author = userRepository.findById(documentBestMach.getCreatedBy()).orElse(null);;
             if(author!=null){
                 response.setEmailAuthor(author.getEmail());
                 response.setNameAuthor(author.getName());
             }
-        }else if(bestMatch >= similarityPercentage && bestMatch <= acceptancePercentage ){
-            File source = new File(uploadDir + File.separator+"img"+ File.separator+"partialfake.jpg");
-            File dest = new File(uploadDir + File.separator+"tmp"+File.separator+ uuid + "_differeFake.jpg");
-            FileUtils.copyFile(source, dest);
-        }else if(bestMatch < similarityPercentage){
-            File source = new File(uploadDir + File.separator+"img"+File.separator+"fake.jpg");
-            File dest = new File(uploadDir + File.separator+"tmp"+File.separator + uuid + "_differeFake.jpg");
-            FileUtils.copyFile(source, dest);
         }
 
         response.setStatus(0);
@@ -354,11 +353,11 @@ public class DocumentService {
             ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity("http://localhost:8083/decodeqr/verifyImageQR", httpEntity,
                     VerifyImageQrResponseDTO.class);
 
-            System.out.println(responseEntity.getBody().getData());
+            logger.info(responseEntity.getBody().getData());
             data=responseEntity.getBody().getData();
 
         }catch(Exception e){
-            System.out.println(e.getMessage());
+            logger.info(e.getMessage());
         }
         return data;
     }
@@ -367,11 +366,11 @@ public class DocumentService {
         try {
             File file = null;
             if(fileName.equals("fake.jpg")){
-                file = new File(uploadDir + File.separator + "img" + File.separator + "fake.jpg");
+                file = new File(workdir + File.separator + "lib" + File.separator + "fake.jpg");
             }else if(fileName.contains("differeFake.jpg")){
-                file = new File(uploadDir + File.separator + "tmp" + File.separator + fileName);
+                file = new File(workdir + File.separator + "tmp" + File.separator + fileName);
             }else{
-                file = new File(uploadDir + File.separator + "ImgSealed" + File.separator + fileName);
+                file = new File(workdir + File.separator + "FilesSealed" + File.separator + fileName);
             }
             if(file.exists()){
                 //get the mimetype
@@ -385,7 +384,7 @@ public class DocumentService {
                 /**
                  * Here we have mentioned it to show inline
                  */
-                System.out.println("filename: " + file.getName());
+                logger.info("filename: " + file.getName());
                 response.setHeader("Content-Disposition", String.format("inline; filename=\"" + file.getName() + "\""));
                 response.setContentLength((int) file.length());
                 InputStream inputStream = new BufferedInputStream(new FileInputStream(file));
