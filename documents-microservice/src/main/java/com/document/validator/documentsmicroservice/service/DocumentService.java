@@ -55,8 +55,8 @@ public class DocumentService {
     private double acceptancePercentage;
     @Value("${app.similarityPercentage}")
     private double similarityPercentage;
-    @Value("${app.microservice.domain}")
-    private String domain;
+    @Value("${app.decodeqr-microservice.domain}")
+    private String decodeqrDomain;
 
 
     Logger logger = LogManager.getLogger(getClass());
@@ -166,15 +166,15 @@ public class DocumentService {
                         } else if (matchPorcentage>similarityPercentage) {
                             responseDTO.setStatus(1);
                             responseDTO.setCodeError("DOCU004");
-                            responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\none of the images in our database by [author] (please be warned it’s not identical) "); //El documento contiene una firma no reconocida
+                            responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\none of the images in our database by [author] (please be warned it’s not identical) "); // Firmado, pero  muy parecido.
                             responseDTO.setFileName(uuid + "_differeFake.jpg");
 
                             logger.info("|Val|SinQRcomparingFinFake."+LocalDateTime.now());
                             return responseDTO;
                         } else {
                             responseDTO.setStatus(1);
-                            responseDTO.setCodeError("DOCU004");
-                            responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity"); //El documento contiene una firma no reconocida
+                            responseDTO.setCodeError("DOCU003");
+                            responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity"); // Firmado, pero no es el mismo.
                             responseDTO.setFileName(uuid + "_differeFake.jpg");
 
                             logger.info("|Val|SinQRComparingNotSaledFinFake."+LocalDateTime.now());
@@ -183,7 +183,7 @@ public class DocumentService {
                     }else{
                         responseDTO.setStatus(1);
                         responseDTO.setCodeError("DOCU002");
-                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation");
+                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation"); // Firma invalida
                         responseDTO.setFileName("fake.jpg");
 
                         logger.info("|Val|SinQRNotSaledFinFake."+LocalDateTime.now());
@@ -203,6 +203,7 @@ public class DocumentService {
                         double resCompare = fileService.compareContentImage(rutaArchivo, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
                         matchPorcentage = 100 - resCompare;
                     }
+                    logger.info("matchPorcentage: " + matchPorcentage);
                     if(matchPorcentage>=acceptancePercentage){
                         responseDTO.setDocumentId(compareMinisResponseDTO.getDocument().getId());
                         responseDTO.setCreatedDate(compareMinisResponseDTO.getDocument().getCreatedDate());
@@ -218,7 +219,7 @@ public class DocumentService {
                         return responseDTO;
                     } else if (matchPorcentage>similarityPercentage) {
                         responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU004");
+                        responseDTO.setCodeError("DOCU005");
                         responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)"); //El documento contiene una firma no reconocida
                         responseDTO.setFileName(uuid + "_differeFake.jpg");
 
@@ -226,7 +227,7 @@ public class DocumentService {
                         return responseDTO;
                     } else {
                         responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU004");
+                        responseDTO.setCodeError("DOCU001");
                         responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation"); //El documento contiene una firma no reconocida
                         responseDTO.setFileName("fake.jpg");
 
@@ -243,13 +244,21 @@ public class DocumentService {
                     //json=decodedBytes.toString();
                     document = gson.fromJson(seal, Document.class);
                     Document documentBD = documentRepository.findById(document.getId()).orElse(null);
-                    if (documentBD==null || !documentBD.getHashSignedDocument().equals(fileService.generateHash(rutaArchivoFirmado))) {
+                    if (documentBD==null){
                         responseDTO.setStatus(1);
                         responseDTO.setCodeError("DOCU002");
-                        responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)");
+                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation");
                         responseDTO.setFileName("fake.jpg");
 
-                        logger.info("|Val|SinQRFinFake."+LocalDateTime.now());
+                        logger.info("|Val|SinQRFake."+LocalDateTime.now());
+                        return responseDTO;
+                    }else if(!documentBD.getHashSignedDocument().equals(fileService.generateHash(rutaArchivoFirmado))) {
+                        responseDTO.setStatus(1);
+                        responseDTO.setCodeError("DOCU003");
+                        responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity");
+                        responseDTO.setFileName("fake.jpg");
+
+                        logger.info("|Val|SinQRFake."+LocalDateTime.now());
                         return responseDTO;
                     }else{
                         User user = userRepository.getReferenceById(documentBD.getCreatedBy());
@@ -353,7 +362,7 @@ public class DocumentService {
             multipartBodyBuilder.part("file", file1, MediaType.IMAGE_JPEG);
             MultiValueMap<String, HttpEntity<?>> multipartBody = multipartBodyBuilder.build();
             HttpEntity<MultiValueMap<String, HttpEntity<?>>> httpEntity = new HttpEntity<>(multipartBody, headers);
-            ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity(domain + "decodeqr/verifyImageQR", httpEntity,
+            ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity(decodeqrDomain + "decodeqr/verifyImageQR", httpEntity,
                     VerifyImageQrResponseDTO.class);
 
             logger.info(responseEntity.getBody().getData());

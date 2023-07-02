@@ -1,4 +1,4 @@
-package com.document.validator.documentsmicroservice.dto;
+package com.document.validator.telegramscheduler.dto;
 
 import lombok.Data;
 import java.util.Date;

@@ -48,11 +48,7 @@ public class DocumentController {
     public ResponseEntity<ValidateResponseDTO> validate(@RequestParam("file") MultipartFile file) throws Exception {
 
         ValidateResponseDTO responseDTO= documentService.validate(file);
-
-        if(responseDTO.getStatus()==0)
-            return ResponseEntity.ok(responseDTO);
-        else
-            return ResponseEntity.badRequest().body(responseDTO);
+        return ResponseEntity.ok(responseDTO);
     }
 
     @RequestMapping("/download/{fileName:.+}")
