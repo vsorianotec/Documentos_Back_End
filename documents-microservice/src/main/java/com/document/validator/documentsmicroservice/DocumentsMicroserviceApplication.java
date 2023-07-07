@@ -25,7 +25,7 @@ public class DocumentsMicroserviceApplication {
 
 		// Started the application
 		SpringApplication app = new SpringApplication(DocumentsMicroserviceApplication.class);
-		app.setDefaultProperties(Collections.singletonMap("server.port", "8082"));
+		app.setDefaultProperties(Collections.singletonMap("server.port", "9082"));
 		app.run(args);
 		OpenCV.loadShared();
 	}

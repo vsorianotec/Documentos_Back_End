@@ -24,7 +24,7 @@ public class AuthenticationMicroserviceApplication {
 
 		// Started the application
 		SpringApplication app = new SpringApplication(AuthenticationMicroserviceApplication.class);
-		app.setDefaultProperties(Collections.singletonMap("server.port", "8081"));
+		app.setDefaultProperties(Collections.singletonMap("server.port", "9081"));
 		app.run(args);
 	}
 

@@ -27,7 +27,7 @@ public class DecodeQrMicroserviceApplication {
 
         // Started the application
         SpringApplication app = new SpringApplication(DecodeQrMicroserviceApplication.class);
-        app.setDefaultProperties(Collections.singletonMap("server.port", "8083"));
+        app.setDefaultProperties(Collections.singletonMap("server.port", "9083"));
         app.run(args);
     }
 
