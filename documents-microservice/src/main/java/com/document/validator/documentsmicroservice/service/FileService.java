@@ -1,5 +1,7 @@
 package com.document.validator.documentsmicroservice.service;
 
+import com.document.validator.documentsmicroservice.dto.GenericResponseDTO;
+import com.document.validator.documentsmicroservice.dto.SingVideoRequest;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.google.gson.Gson;
 import com.google.zxing.BarcodeFormat;
@@ -14,8 +16,20 @@ import org.apache.logging.log4j.Logger;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.videoio.VideoCapture;
+import org.opencv.videoio.VideoWriter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -45,12 +59,17 @@ public class FileService {
     @Value("${app.workdir}")
     public String workdir;
 
+    @Value("${app.decodeqr-microservice.domain}")
+    private String decodeqrDomain;
+
     Logger logger = LogManager.getLogger(getClass());
+
+    Gson gson = new Gson();
 
     public String changeFileExtension(String filExtension){
         switch (filExtension){
-            case "mp4":
-                return "avi";
+            //case "mp4":
+            //    return "avi";
             case "wav":
                 return "mp3";
             case "jpeg":
@@ -63,13 +82,10 @@ public class FileService {
     }
 
     public boolean isStaticImage(String fileExtension){
-        if(fileExtension.equals("jpg") || fileExtension.equals("jpeg") || fileExtension.equals("png") || fileExtension.equals("jfif")){
-            return true;
-        }else{
-            return false;
-        }
-
-
+        return fileExtension.equals("jpg") || fileExtension.equals("jpeg") || fileExtension.equals("png") || fileExtension.equals("jfif");
+    }
+    public boolean isVideo(String fileExtension){
+        return fileExtension.equals("mp4") || fileExtension.equals("avi");
     }
 
     public void generateCompressImage(String inputImagePath,String outputImagePath) throws IOException {
@@ -112,10 +128,7 @@ public class FileService {
 
     public void sealImage(String inputImagePath, String outputImagePath, Document document) throws Exception{
         try {
-            String signature = document.getId() 
-                    + "|" + document.getHashOriginalDocument()
-                    + "|" + document.getCreatedDate()
-                    + "|" + document.getCreatedBy();
+            String signature = gson.toJson(document);
             String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
             Integer sizemax = getSizemaxImage(inputImagePath);
             generateQR(signature, qrCodePath, sizemax);
@@ -132,7 +145,6 @@ public class FileService {
 
     public void sealFile(String inputImagePath, String outputImagePath, Document document) throws Exception{
 
-        Gson gson = new Gson();
         //String selloAlipse = "--AliPse" + Base64.encodeBase64(gson.toJson(document)) + "EOS--";
         String selloAlipse = "--AliPse" + gson.toJson(document) + "EOS--";
         logger.info("selloAlipse: " + selloAlipse);
@@ -508,5 +520,31 @@ public class FileService {
         Highgui.imwrite(rutaArchivoDiffereFake , dst);
 
         return differ;
+    }
+
+    public void sealVideo(String inputVideoPath, String outputVideoPath, Document document) throws Exception{
+        try {
+            // Contenido del código QR
+            String signature = gson.toJson(document);
+            String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
+            generateQR(signature, qrCodePath, 200);
+
+            SingVideoRequest singVideoRequest = new SingVideoRequest();
+            singVideoRequest.setInputVideoPath(inputVideoPath);
+            singVideoRequest.setOutputVideoPath(outputVideoPath);
+            singVideoRequest.setQrCodePath(qrCodePath);
+
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<GenericResponseDTO> responseEntity = restTemplate.postForEntity(decodeqrDomain + "decodeqr/addQRVideo", singVideoRequest,
+                    GenericResponseDTO.class);
+            logger.info(responseEntity.getBody());
+            GenericResponseDTO responseDTO=responseEntity.getBody();
+            if(responseDTO== null || responseDTO.getStatus()!=0){
+                throw new Exception("Error en decodeqr/addQRVideo");
+            }
+        }catch (Exception e){
+            logger.info("Error en el sellado deL video");
+            throw e;
+        }
     }
 }

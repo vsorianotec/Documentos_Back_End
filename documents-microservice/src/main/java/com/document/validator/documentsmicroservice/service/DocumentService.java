@@ -1,9 +1,6 @@
 package com.document.validator.documentsmicroservice.service;
 
-import com.document.validator.documentsmicroservice.dto.CompareMinisResponseDTO;
-import com.document.validator.documentsmicroservice.dto.SingResponseDTO;
-import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
-import com.document.validator.documentsmicroservice.dto.VerifyImageQrResponseDTO;
+import com.document.validator.documentsmicroservice.dto.*;
 import com.document.validator.documentsmicroservice.entity.Document;
 import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
@@ -58,7 +55,7 @@ public class DocumentService {
     @Value("${app.decodeqr-microservice.domain}")
     private String decodeqrDomain;
 
-
+    Gson gson = new Gson();
     Logger logger = LogManager.getLogger(getClass());
 
     public SingResponseDTO sign(MultipartFile file, String description, int userId){
@@ -92,6 +89,8 @@ public class DocumentService {
                 fileService.generateCompressImage(rutaArchivoOriginal,rutaArchivoOriginalCompress);
                 fileService.generateThumbnail(rutaArchivoOriginal, workdir + File.separator + "min"+ File.separator+"m_"+uuid+".jpg");
                 fileService.sealImage(rutaArchivoOriginal,rutaArchivoFirmado,document);
+            }else if(fileService.isVideo(fileext)){
+                fileService.sealVideo(rutaArchivoOriginal,rutaArchivoFirmado,document);
             }else {
                 fileService.sealFile(rutaArchivoOriginal,rutaArchivoFirmado,document);
             }
@@ -114,7 +113,7 @@ public class DocumentService {
 
     public ValidateResponseDTO validate(MultipartFile file){
         ValidateResponseDTO responseDTO=new ValidateResponseDTO();
-        Gson gson = new Gson();
+
         Path copyLocation = null;
 
         try {
@@ -128,162 +127,17 @@ public class DocumentService {
             String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
 
             String seal="";
-            Document document  = new Document();
-            if(fileService.isStaticImage(fileext)){
-                seal= verifiyImageQr(rutaArchivoFirmado);
-                logger.info("Response QR: "+seal);
-                if (!seal.equals("")) { // Exists QR
-                    String[] parts = seal.split("\\|"); //Result convert in matrix and set in document object
-                    if(parts.length>0) {
-                        document.setId(Integer.parseInt(parts[0]));
-                        document.setHashOriginalDocument(parts[1]);
-                        document.setCreatedBy(Integer.parseInt(parts[3]));
-                    }
-                    Document documentBD = documentRepository.findById(document.getId()).orElse(null);
-                    if (documentBD!=null ) {
-                        logger.info("<4>Find with OpenCV . "+ LocalDateTime.now());
-                        logger.info("Begin comparing...");
-                        String rutaArchivoQR = workdir +File.separator +"FilesSealed"+File.separator+documentBD.getUuid() + ".jpg";
-                        String rutaArchivoFakeSize = workdir +File.separator+"lib"+File.separator+"fake_size.jpg";
-                        String rutaArchivoDiffereFake = workdir + File.separator+"tmp"+File.separator+ uuid + "_differeFake.jpg";
-                        double resCompare= fileService.compareContentImage(rutaArchivoQR,rutaArchivoFirmado,rutaArchivoFakeSize,rutaArchivoDiffereFake);
-                        double matchPorcentage=100 - resCompare;
-                        logger.info("matchPorcentage: " + matchPorcentage);
-                        if(matchPorcentage>acceptancePercentage){
-                            User user = userRepository.getReferenceById(documentBD.getCreatedBy());
-                            logger.info("File signed: "+rutaArchivoFirmado);
-
-                            responseDTO.setStatus(0);
-                            responseDTO.setCodeError("DOCU000");
-                            responseDTO.setMsgError("OK");
-                            responseDTO.setDocumentId(documentBD.getId());
-                            responseDTO.setCreatedDate(documentBD.getCreatedDate());
-                            responseDTO.setOriginalName(documentBD.getFileName());
-                            responseDTO.setAuthor(user.getName());
-                            responseDTO.setEmail(user.getEmail());
-                            logger.info("|Val|ConQROK."+LocalDateTime.now());
-                            // 2% umbral corrección
-                        } else if (matchPorcentage>similarityPercentage) {
-                            responseDTO.setStatus(1);
-                            responseDTO.setCodeError("DOCU004");
-                            responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\none of the images in our database by [author] (please be warned it’s not identical) "); // Firmado, pero  muy parecido.
-                            responseDTO.setFileName(uuid + "_differeFake.jpg");
-
-                            logger.info("|Val|SinQRcomparingFinFake."+LocalDateTime.now());
-                            return responseDTO;
-                        } else {
-                            responseDTO.setStatus(1);
-                            responseDTO.setCodeError("DOCU003");
-                            responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity"); // Firmado, pero no es el mismo.
-                            responseDTO.setFileName(uuid + "_differeFake.jpg");
-
-                            logger.info("|Val|SinQRComparingNotSaledFinFake."+LocalDateTime.now());
-                            return responseDTO;
-                        }
-                    }else{
-                        responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU002");
-                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation"); // Firma invalida
-                        responseDTO.setFileName("fake.jpg");
-
-                        logger.info("|Val|SinQRNotSaledFinFake."+LocalDateTime.now());
-                        return responseDTO;
-                    }
-                }else{
-                    String rutaMiniatura= workdir + File.separator + "min"+ File.separator+"mtmp_"+fileName;
-                    fileService.generateThumbnail(rutaArchivoFirmado,rutaMiniatura);
-                    CompareMinisResponseDTO compareMinisResponseDTO = compareMinis(rutaMiniatura);
-                    Files.delete(Paths.get(rutaMiniatura));
-                    double matchPorcentage=compareMinisResponseDTO.getMatchPercentage();
-                    String rutaArchivoDiffereFake=null;
-                    if(compareMinisResponseDTO.getMatchPercentage()>=acceptancePercentage) {
-                        String rutaArchivo = workdir + File.separator + "files" + File.separator + compareMinisResponseDTO.getDocument().getFileName();
-                        String rutaArchivoFakeSize = workdir + File.separator + "lib" + File.separator + "fake_size.jpg";
-                        rutaArchivoDiffereFake = workdir + File.separator + "tmp" + File.separator + uuid + "_differeFake.jpg";
-                        double resCompare = fileService.compareContentImage(rutaArchivo, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
-                        matchPorcentage = 100 - resCompare;
-                    }
-                    logger.info("matchPorcentage: " + matchPorcentage);
-                    if(matchPorcentage>=acceptancePercentage){
-                        responseDTO.setDocumentId(compareMinisResponseDTO.getDocument().getId());
-                        responseDTO.setCreatedDate(compareMinisResponseDTO.getDocument().getCreatedDate());
-                        responseDTO.setOriginalName(compareMinisResponseDTO.getDocument().getFileName());
-                        responseDTO.setAuthor(compareMinisResponseDTO.getNameAuthor());
-                        responseDTO.setEmail(compareMinisResponseDTO.getEmailAuthor());
-
-                        responseDTO.setStatus(0);
-                        responseDTO.setCodeError("DOCU000");
-                        responseDTO.setMsgError("OK");
-
-                        logger.info("|Val|FinMiniOK."+LocalDateTime.now());
-                        return responseDTO;
-                    } else if (matchPorcentage>similarityPercentage) {
-                        responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU005");
-                        responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)"); //El documento contiene una firma no reconocida
-                        responseDTO.setFileName(uuid + "_differeFake.jpg");
-
-                        logger.info("|Val|FinMiniLike."+LocalDateTime.now());
-                        return responseDTO;
-                    } else {
-                        responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU001");
-                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation"); //El documento contiene una firma no reconocida
-                        responseDTO.setFileName("fake.jpg");
-
-                        logger.info("|Val|FinMiniFake."+LocalDateTime.now());
-                        return responseDTO;
-                    }
-                }
-            }else{
+            if(fileService.isStaticImage(fileext)) {
+                seal = verifiyImageQr(rutaArchivoFirmado);
+                validateSealImage(seal,rutaArchivoFirmado,uuid,fileName);
+            }
+            else if(fileService.isVideo(fileext)){
+                seal = verifiyVideoQr(rutaArchivoFirmado);
+                return validateSeal(seal,rutaArchivoFirmado);
+            }
+            else{
                 seal=fileService.getSeal(rutaArchivoFirmado);
-                if(!seal.equals("")){
-                    logger.info("json: " + seal);
-                    //byte[] decodedBytes = Base64.decodeBase64(seal);
-                    //logger.info("decodedBytes " + new String(decodedBytes));
-                    //json=decodedBytes.toString();
-                    document = gson.fromJson(seal, Document.class);
-                    Document documentBD = documentRepository.findById(document.getId()).orElse(null);
-                    if (documentBD==null){
-                        responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU002");
-                        responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation");
-                        responseDTO.setFileName("fake.jpg");
-
-                        logger.info("|Val|SinQRFake."+LocalDateTime.now());
-                        return responseDTO;
-                    }else if(!documentBD.getHashSignedDocument().equals(fileService.generateHash(rutaArchivoFirmado))) {
-                        responseDTO.setStatus(1);
-                        responseDTO.setCodeError("DOCU003");
-                        responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity");
-                        responseDTO.setFileName("fake.jpg");
-
-                        logger.info("|Val|SinQRFake."+LocalDateTime.now());
-                        return responseDTO;
-                    }else{
-                        User user = userRepository.getReferenceById(documentBD.getCreatedBy());
-                        logger.info("File signed: "+rutaArchivoFirmado);
-
-                        responseDTO.setStatus(0);
-                        responseDTO.setCodeError("DOCU000");
-                        responseDTO.setMsgError("OK");
-                        responseDTO.setDocumentId(documentBD.getId());
-                        responseDTO.setCreatedDate(documentBD.getCreatedDate());
-                        responseDTO.setOriginalName(documentBD.getFileName());
-                        responseDTO.setAuthor(user.getName());
-                        responseDTO.setEmail(user.getEmail());
-                        logger.info("|Val|SinQROK."+LocalDateTime.now());
-                    }
-                }else{
-                    responseDTO.setStatus(1);
-                    responseDTO.setCodeError("DOCU001");
-                    responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation");
-                    responseDTO.setFileName("fake.jpg");
-
-                    logger.info("|Val|FinSinQRFake."+LocalDateTime.now());
-                    return responseDTO;
-                }
-
+                return validateSeal(seal,rutaArchivoFirmado);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -301,6 +155,179 @@ public class DocumentService {
         }
         logger.info("|validate|FinOK."+LocalDateTime.now());
         return responseDTO;
+    }
+    private ValidateResponseDTO validateSealImage(String seal,String rutaArchivoFirmado,String uuid,String fileName) throws Exception{
+        ValidateResponseDTO responseDTO = new ValidateResponseDTO();
+        if (!seal.equals("")) { // Exists QR
+            Document document = gson.fromJson(seal, Document.class);
+            Document documentBD = documentRepository.findById(document.getId()).orElse(null);
+            if (documentBD != null) {
+                logger.info("<4>Find with OpenCV . " + LocalDateTime.now());
+                logger.info("Begin comparing...");
+                String rutaArchivoQR = workdir + File.separator + "FilesSealed" + File.separator + documentBD.getUuid() + ".jpg";
+                String rutaArchivoFakeSize = workdir + File.separator + "lib" + File.separator + "fake_size.jpg";
+                String rutaArchivoDiffereFake = workdir + File.separator + "tmp" + File.separator + uuid + "_differeFake.jpg";
+                double resCompare = fileService.compareContentImage(rutaArchivoQR, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
+                double matchPorcentage = 100 - resCompare;
+                logger.info("matchPorcentage: " + matchPorcentage);
+                if (matchPorcentage > acceptancePercentage) {
+                    User user = userRepository.getReferenceById(documentBD.getCreatedBy());
+                    logger.info("File signed: " + rutaArchivoFirmado);
+
+                    responseDTO.setStatus(0);
+                    responseDTO.setCodeError("DOCU000");
+                    responseDTO.setMsgError("OK");
+                    responseDTO.setDocumentId(documentBD.getId());
+                    responseDTO.setCreatedDate(documentBD.getCreatedDate());
+                    responseDTO.setOriginalName(documentBD.getFileName());
+                    responseDTO.setAuthor(user.getName());
+                    responseDTO.setEmail(user.getEmail());
+                    logger.info("|Val|ConQROK." + LocalDateTime.now());
+                    return responseDTO;
+                } else if (matchPorcentage > similarityPercentage) {
+                    responseDTO.setStatus(1);
+                    responseDTO.setCodeError("DOCU004");
+                    responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\none of the images in our database by [author] (please be warned it’s not identical) "); // Firmado, pero  muy parecido.
+                    responseDTO.setFileName(uuid + "_differeFake.jpg");
+
+                    logger.info("|Val|SinQRcomparingFinFake." + LocalDateTime.now());
+                    return responseDTO;
+                } else {
+                    responseDTO.setStatus(1);
+                    responseDTO.setCodeError("DOCU003");
+                    responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity"); // Firmado, pero no es el mismo.
+                    responseDTO.setFileName(uuid + "_differeFake.jpg");
+
+                    logger.info("|Val|SinQRComparingNotSaledFinFake." + LocalDateTime.now());
+                    return responseDTO;
+                }
+            } else {
+                responseDTO.setStatus(1);
+                responseDTO.setCodeError("DOCU002");
+                responseDTO.setMsgError("Alipsé Sealed FAKE file\n[the author] invests to avoid impersonation"); // Firma invalida
+                responseDTO.setFileName("fake.jpg");
+
+                logger.info("|Val|SinQRNotSaledFinFake." + LocalDateTime.now());
+                return responseDTO;
+            }
+        }
+        else {
+            String rutaMiniatura = workdir + File.separator + "min" + File.separator + "mtmp_" + fileName;
+            fileService.generateThumbnail(rutaArchivoFirmado, rutaMiniatura);
+            CompareMinisResponseDTO compareMinisResponseDTO = compareMinis(rutaMiniatura);
+            Files.delete(Paths.get(rutaMiniatura));
+            double matchPorcentage = compareMinisResponseDTO.getMatchPercentage();
+            String rutaArchivoDiffereFake = null;
+            if (compareMinisResponseDTO.getMatchPercentage() >= acceptancePercentage) {
+                String rutaArchivo = workdir + File.separator + "files" + File.separator + compareMinisResponseDTO.getDocument().getFileName();
+                String rutaArchivoFakeSize = workdir + File.separator + "lib" + File.separator + "fake_size.jpg";
+                rutaArchivoDiffereFake = workdir + File.separator + "tmp" + File.separator + uuid + "_differeFake.jpg";
+                double resCompare = fileService.compareContentImage(rutaArchivo, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
+                matchPorcentage = 100 - resCompare;
+            }
+            logger.info("matchPorcentage: " + matchPorcentage);
+            if (matchPorcentage >= acceptancePercentage) {
+                responseDTO.setDocumentId(compareMinisResponseDTO.getDocument().getId());
+                responseDTO.setCreatedDate(compareMinisResponseDTO.getDocument().getCreatedDate());
+                responseDTO.setOriginalName(compareMinisResponseDTO.getDocument().getFileName());
+                responseDTO.setAuthor(compareMinisResponseDTO.getNameAuthor());
+                responseDTO.setEmail(compareMinisResponseDTO.getEmailAuthor());
+
+                responseDTO.setStatus(0);
+                responseDTO.setCodeError("DOCU000");
+                responseDTO.setMsgError("OK");
+
+                logger.info("|Val|FinMiniOK." + LocalDateTime.now());
+                return responseDTO;
+            }
+            else if (matchPorcentage > similarityPercentage) {
+                responseDTO.setStatus(1);
+                responseDTO.setCodeError("DOCU005");
+                responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)"); //El documento contiene una firma no reconocida
+                responseDTO.setFileName(uuid + "_differeFake.jpg");
+
+                logger.info("|Val|FinMiniLike." + LocalDateTime.now());
+                return responseDTO;
+            }
+            else {
+                responseDTO.setStatus(1);
+                responseDTO.setCodeError("DOCU001");
+                responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation"); //El documento contiene una firma no reconocida
+                responseDTO.setFileName("fake.jpg");
+
+                logger.info("|Val|FinMiniFake." + LocalDateTime.now());
+                return responseDTO;
+            }
+        }
+    }
+
+    private ValidateResponseDTO validateSeal(String seal,String rutaArchivoFirmado){
+        ValidateResponseDTO responseDTO = new ValidateResponseDTO();
+        if(!seal.equals("")){
+            logger.info("json: " + seal);
+            //byte[] decodedBytes = Base64.decodeBase64(seal);
+            //logger.info("decodedBytes " + new String(decodedBytes));
+            //json=decodedBytes.toString();
+            Document document = gson.fromJson(seal, Document.class);
+            Document documentBD = documentRepository.findById(document.getId()).orElse(null);
+            if (documentBD==null){
+                responseDTO.setStatus(1);
+                responseDTO.setCodeError("DOCU002");
+                responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation");
+                responseDTO.setFileName("fake.jpg");
+
+                logger.info("|Val|SinQRFake."+LocalDateTime.now());
+                return responseDTO;
+            }else if(!documentBD.getHashSignedDocument().equals(fileService.generateHash(rutaArchivoFirmado))) {
+                responseDTO.setStatus(1);
+                responseDTO.setCodeError("DOCU003");
+                responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity");
+                responseDTO.setFileName("fake.jpg");
+
+                logger.info("|Val|SinQRFake."+LocalDateTime.now());
+                return responseDTO;
+            }else{
+                User user = userRepository.getReferenceById(documentBD.getCreatedBy());
+                logger.info("File signed: "+rutaArchivoFirmado);
+
+                responseDTO.setStatus(0);
+                responseDTO.setCodeError("DOCU000");
+                responseDTO.setMsgError("OK");
+                responseDTO.setDocumentId(documentBD.getId());
+                responseDTO.setCreatedDate(documentBD.getCreatedDate());
+                responseDTO.setOriginalName(documentBD.getFileName());
+                responseDTO.setAuthor(user.getName());
+                responseDTO.setEmail(user.getEmail());
+                logger.info("|Val|SinQROK."+LocalDateTime.now());
+                return responseDTO;
+            }
+        }else{
+            String hash= fileService.generateHash(rutaArchivoFirmado);
+            Document documentBD = documentRepository.findByHashOriginalDocument(hash);
+            if (documentBD==null){
+                responseDTO.setStatus(1);
+                responseDTO.setCodeError("DOCU002");
+                responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation");
+                responseDTO.setFileName("fake.jpg");
+
+                logger.info("|Val|SinQRFake."+LocalDateTime.now());
+                return responseDTO;
+            }else{
+                User user = userRepository.getReferenceById(documentBD.getCreatedBy());
+                logger.info("File signed: "+rutaArchivoFirmado);
+
+                responseDTO.setStatus(0);
+                responseDTO.setCodeError("DOCU000");
+                responseDTO.setMsgError("OK");
+                responseDTO.setDocumentId(documentBD.getId());
+                responseDTO.setCreatedDate(documentBD.getCreatedDate());
+                responseDTO.setOriginalName(documentBD.getFileName());
+                responseDTO.setAuthor(user.getName());
+                responseDTO.setEmail(user.getEmail());
+                logger.info("|Val|SinQROK."+LocalDateTime.now());
+                return responseDTO;
+            }
+        }
     }
 
     private CompareMinisResponseDTO compareMinis(String rutaArchivoMiniUpload) throws IOException {
@@ -372,6 +399,38 @@ public class DocumentService {
             logger.info(e.getMessage());
         }
         return data;
+    }
+
+    public String verifiyVideoQr(String pathVideo){
+
+        String pathImage=getFirstImageVideo(pathVideo);
+        if(pathImage.isEmpty()){
+            return "";
+        }else{
+            return verifiyImageQr(pathImage);
+        }
+    }
+
+    public String getFirstImageVideo(String pathVideo){
+        try {
+            String pathImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + ".jpg";
+            GetFirstImageVideoRequest request = new GetFirstImageVideoRequest();
+            request.setInputVideoPath(pathVideo);
+            request.setOutputImagePath(pathImage);
+
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<GenericResponseDTO> responseEntity = restTemplate.postForEntity(decodeqrDomain + "decodeqr/getFirstImageVideo",
+                    request, GenericResponseDTO.class);
+            logger.info(responseEntity.getBody());
+            GenericResponseDTO responseDTO=responseEntity.getBody();
+            if(responseDTO== null || responseDTO.getStatus()!=0){
+                throw new Exception("Error en decodeqr/getFirstImageVideo");
+            }
+            return pathImage;
+        }catch(Exception e){
+            logger.info(e.getMessage());
+            return "";
+        }
     }
 
     public void download(String fileName,HttpServletResponse response){

@@ -1,6 +1,8 @@
 package com.document.validator.decodeqrmicroservice.controller;
 
 import com.document.validator.decodeqrmicroservice.dto.GenericResponseDTO;
+import com.document.validator.decodeqrmicroservice.dto.GetFirstImageVideoRequest;
+import com.document.validator.decodeqrmicroservice.dto.SingVideoRequest;
 import com.document.validator.decodeqrmicroservice.dto.VerifyImageQrResponseDTO;
 import com.document.validator.decodeqrmicroservice.service.DecodeQrService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,5 +38,23 @@ public class DecodeQrController {
             return ResponseEntity.ok(responseDTO);
         else
             return ResponseEntity.badRequest().body(responseDTO);
+    }
+
+    @PostMapping("/addQRVideo")
+    public ResponseEntity<GenericResponseDTO> addQRVideo(@RequestBody SingVideoRequest request){
+        GenericResponseDTO response = decodeQrService.addQRVideo(request);
+        if(response.getStatus()==0)
+            return ResponseEntity.ok(response);
+        else
+            return ResponseEntity.badRequest().body(response);
+    }
+
+    @PostMapping("/getFirstImageVideo")
+    public ResponseEntity<GenericResponseDTO> getFirstImageVideo(@RequestBody GetFirstImageVideoRequest request){
+        GenericResponseDTO response = decodeQrService.getFirstImageVideo(request);
+        if(response.getStatus()==0)
+            return ResponseEntity.ok(response);
+        else
+            return ResponseEntity.badRequest().body(response);
     }
 }

@@ -2,6 +2,9 @@ package com.document.validator.authenticationmicroservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -26,6 +29,16 @@ public class AuthenticationMicroserviceApplication {
 		SpringApplication app = new SpringApplication(AuthenticationMicroserviceApplication.class);
 		app.setDefaultProperties(Collections.singletonMap("server.port", "9081"));
 		app.run(args);
+	}
+
+	@Bean
+	public WebMvcConfigurer corsConfigurer() {
+		return new WebMvcConfigurer() {
+			@Override
+			public void addCorsMappings(CorsRegistry registry) {
+				registry.addMapping("*").allowedOrigins("*");
+			}
+		};
 	}
 
 }
