@@ -12,7 +12,7 @@ public class PropertiesConfiguration {
     public PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
         PropertySourcesPlaceholderConfigurer properties =
                 new PropertySourcesPlaceholderConfigurer();
-        properties.setLocation(new FileSystemResource("/app/aipse/application.properties"));
+        properties.setLocation(new FileSystemResource("/app/alipse/application.properties"));
         properties.setIgnoreResourceNotFound(false);
         return properties;
     }
