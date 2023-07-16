@@ -1,30 +1,23 @@
 FROM airdock/oraclejdk:1.8
 
-COPY target/authentication-microservice-1.0.0.jar /opt/tmp/authentication-microservice-1.0.0.jar
+COPY target/authentication-microservice-1.0.0 /opt/tmp/authentication-microservice-1.0.0
 
 EXPOSE 9081
 
 ENV TZ=America/Mexico_City
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-CMD java -jar /opt/tmp/authentication-microservice-1.0.0.jar
+CMD java -jar /opt/tmp/authentication-microservice-1.0.0
 
-# PERMISOS DE DOCKER
-#     su - {usuario}
 # CREAR JAR
-#     mvn clean package
+# clean package
 # EJECUCIÓN BÁSICA:
-#     docker build -t authentication-image-1.0 .
-#     docker images
-#     docker run -p 9081:9081 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --name authentication-docker-1.0 authentication-image-1.0
-#     docker container stop authentication-docker-1.0
-#     docker rm authentication-docker-1.0
-#     docker rmi image authentication-image-1.0
-#     docker ps -a
+# docker build -t base-image-0.1 .
+# docker run -p 9090:9090 --mount type=bind,source=c:/app/accendonet,target=/app/accendonet --name base-docker-0.1 base-image-0.1
+# docker container stop base-docker-0.1
 
 # EJECUCIÓN CON REPLICAS
 # docker swarm init
-# docker build -t authentication-image-1.0 .
-# docker service create -p 9081:9081 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --replicas 3 authentication-image-1.0
-# docker service ls
+# docker build -t base-image-0.1 .
+# docker service create -p 9090:9090 --mount type=bind,source=c:/app/accendonet,target=/app/accendonet --replicas 3 base-image-0.1
 # docker service rm beautiful_solomon
