@@ -129,7 +129,7 @@ public class DocumentService {
             String seal="";
             if(fileService.isStaticImage(fileext)) {
                 seal = verifiyImageQr(rutaArchivoFirmado);
-                validateSealImage(seal,rutaArchivoFirmado,uuid,fileName);
+                return validateSealImage(seal,rutaArchivoFirmado,uuid,fileName);
             }
             else if(fileService.isVideo(fileext)){
                 seal = verifiyVideoQr(rutaArchivoFirmado);
