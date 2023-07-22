@@ -7,7 +7,7 @@ EXPOSE 9081
 ENV TZ=America/Mexico_City
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar
+CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar -Djava.library.path=/app/aipse/lib
 
 # PERMISOS DE DOCKER
 #     su - {usuario}
@@ -16,7 +16,7 @@ CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar
 # EJECUCIÓN BÁSICA:
 #     docker build -t decodeqr-image-1.0 .
 #     docker images
-#     docker run -p 9083:9083 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --name documents-docker-1.0 decodeqr-image-1.0
+#     docker run -p 9083:9083 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --name decodeqr-docker-1.0 decodeqr-image-1.0
 #     docker container stop decodeqr-docker-1.0
 #     docker rm decodeqr-docker-1.0
 #     docker rmi image decodeqr-image-1.0
