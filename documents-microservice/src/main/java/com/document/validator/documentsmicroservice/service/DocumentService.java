@@ -67,9 +67,9 @@ public class DocumentService {
             String uuid = UUID.randomUUID().toString();
             String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
             String fileName= uuid + "."+ fileext;
-            String rutaArchivoFirmado= workdir + File.separator + "FilesSealed" + File.separator + fileName;
-            String rutaArchivoOriginal= workdir + File.separator + "Files" + File.separator + file.getOriginalFilename();
-            String rutaArchivoOriginalCompress= workdir + File.separator + "Files"+ File.separator + "c_"+file.getOriginalFilename();
+            String rutaArchivoFirmado= workdir + File.separator + "filesSealed" + File.separator + fileName;
+            String rutaArchivoOriginal= workdir + File.separator + "files" + File.separator + file.getOriginalFilename();
+            String rutaArchivoOriginalCompress= workdir + File.separator + "files"+ File.separator + "c_"+file.getOriginalFilename();
 
             Path copyLocation = Paths.get(rutaArchivoFirmado);
             Path copyLocationOri = Paths.get(rutaArchivoOriginal);
@@ -164,7 +164,7 @@ public class DocumentService {
             if (documentBD != null) {
                 logger.info("<4>Find with OpenCV . " + LocalDateTime.now());
                 logger.info("Begin comparing...");
-                String rutaArchivoQR = workdir + File.separator + "FilesSealed" + File.separator + documentBD.getUuid() + ".jpg";
+                String rutaArchivoQR = workdir + File.separator + "filesSealed" + File.separator + documentBD.getUuid() + ".jpg";
                 String rutaArchivoFakeSize = workdir + File.separator + "lib" + File.separator + "fake_size.jpg";
                 String rutaArchivoDiffereFake = workdir + File.separator + "tmp" + File.separator + uuid + "_differeFake.jpg";
                 double resCompare = fileService.compareContentImage(rutaArchivoQR, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
@@ -441,7 +441,7 @@ public class DocumentService {
             }else if(fileName.contains("differeFake.jpg")){
                 file = new File(workdir + File.separator + "tmp" + File.separator + fileName);
             }else{
-                file = new File(workdir + File.separator + "FilesSealed" + File.separator + fileName);
+                file = new File(workdir + File.separator + "filesSealed" + File.separator + fileName);
             }
             if(file.exists()){
                 //get the mimetype
