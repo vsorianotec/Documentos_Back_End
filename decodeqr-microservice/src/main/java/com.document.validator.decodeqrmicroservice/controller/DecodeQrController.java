@@ -32,7 +32,7 @@ public class DecodeQrController {
     public ResponseEntity<GenericResponseDTO> verifyImageQR(@RequestParam("file") MultipartFile file
                                                    ) throws Exception {
 
-        VerifyImageQrResponseDTO responseDTO= decodeQrService.verifyImageQr(file);
+        VerifyImageQrResponseDTO responseDTO= decodeQrService.verifyImageQR(file);
         return ResponseEntity.ok(responseDTO);
     }
 
