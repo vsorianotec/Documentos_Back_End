@@ -1,11 +1,16 @@
-FROM airdock/oraclejdk:1.8
+FROM ubuntu:20.04
+
+ENV TZ='America/Mexico_City'
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt update
+
+RUN apt install -y libopencv-dev python3-opencv
 
 COPY target/documents-microservice-1.0.0.jar /opt/tmp/documents-microservice-1.0.0.jar
 
 EXPOSE 9082
-
-ENV TZ=America/Mexico_City
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 CMD java -jar /opt/tmp/documents-microservice-1.0.0.jar
 
