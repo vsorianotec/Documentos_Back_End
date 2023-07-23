@@ -42,7 +42,7 @@ ENTRYPOINT exec java $JAVA_OPTS -jar /opt/tmp/decodeqr-microservice-1.0.jar
 # EJECUCIÓN BÁSICA:
 #     docker build -t decodeqr-image-1.0 .
 #     docker images
-#     docker run -p 9083:9083 --mount type=bind,source=/app/alipse,target=/app/alipse --name decodeqr-docker-1.0 decodeqr-image-1.0
+#     docker run -e JAVA_OPTS='-Xmx4g -Xms4g' -p 9083:9083 -m 4000m --mount type=bind,source=/app/alipse,target=/app/alipse --name decodeqr-docker-1.0 decodeqr-image-1.0
 #     docker container stop decodeqr-docker-1.0
 #     docker rm decodeqr-docker-1.0
 #     docker rmi image decodeqr-image-1.0
