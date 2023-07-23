@@ -64,10 +64,13 @@ public class DecodeQrService {
 
             logger.info(rutaArchivoOriginal);
             Mat img = Imgcodecs.imread(rutaArchivoOriginal);
+            logger.info("img generado");
             QRCodeDetector decoder = new QRCodeDetector();
+            logger.info("decoder generado");
             Mat points = new Mat();
+            logger.info("points generado");
             decoder.detect(img, points);
-
+            logger.info("decoder.detect generado");
             String data = decoder.detectAndDecode(img, points);
             logger.info("Intento (0) resultado...: "+ points.empty());
             if (!points.empty() && data.length()>0) {
