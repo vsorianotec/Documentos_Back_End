@@ -33,7 +33,7 @@ RUN export JAVA_HOME
 
 COPY target/decodeqr-microservice-1.0.jar /opt/tmp/decodeqr-microservice-1.0.jar
 
-CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar
+ENTRYPOINT exec java $JAVA_OPTS -jar /opt/tmp/decodeqr-microservice-1.0.jar
 
 # PERMISOS DE DOCKER
 #     su - {usuario}
