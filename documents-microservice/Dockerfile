@@ -2,12 +2,12 @@ FROM ubuntu:20.04
 
 ENV TZ='America/Mexico_City'
 
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone;
 
 # Install Opencv
-RUN apt update
+RUN apt update;
 
-RUN apt install -y libopencv-dev python3-opencv
+RUN apt install -y libopencv-dev python3-opencv;
 
 # Install OpenJDK-8
 RUN apt-get update && \

@@ -1,11 +1,39 @@
-FROM airdock/oraclejdk:1.8
+FROM ubuntu:20.04
+
+ENV TZ='America/Mexico_City'
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone;
+
+# Install Opencv
+RUN apt update;
+
+RUN apt install -y libopencv-dev python3-opencv;
+
+# Install ffmpeg
+
+RUN apt update && apt upgrade;
+
+RUN apt install -y ffmpeg;
+
+# Install OpenJDK-8
+RUN apt-get update && \
+    apt-get install -y openjdk-8-jdk && \
+    apt-get install -y ant && \
+    apt-get clean;
+    
+# Fix certificate issues
+RUN apt-get update && \
+    apt-get install ca-certificates-java && \
+    apt-get clean && \
+    update-ca-certificates -f;
+
+# Setup JAVA_HOME -- useful for docker commandline
+ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64/
+RUN export JAVA_HOME
+
+# Install microservice
 
 COPY target/decodeqr-microservice-1.0.jar /opt/tmp/decodeqr-microservice-1.0.jar
-
-EXPOSE 9081
-
-ENV TZ=America/Mexico_City
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar
 
