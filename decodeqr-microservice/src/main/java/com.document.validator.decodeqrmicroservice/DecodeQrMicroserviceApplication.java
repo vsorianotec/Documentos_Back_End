@@ -1,5 +1,6 @@
 package com.document.validator.decodeqrmicroservice;
 
+import nu.pattern.OpenCV;
 import org.opencv.core.Core;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -16,8 +17,6 @@ import java.util.Date;
 @SpringBootApplication
 public class DecodeQrMicroserviceApplication {
 
-    static{ System.loadLibrary(Core.NATIVE_LIBRARY_NAME); }
-
     public static void main(String[] args) {
         // Logger with diferente ID
         Date date = Calendar.getInstance().getTime();
@@ -32,6 +31,7 @@ public class DecodeQrMicroserviceApplication {
         SpringApplication app = new SpringApplication(DecodeQrMicroserviceApplication.class);
         app.setDefaultProperties(Collections.singletonMap("server.port", "9083"));
         app.run(args);
+        OpenCV.loadShared();
     }
 
     @Bean
