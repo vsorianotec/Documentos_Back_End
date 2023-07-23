@@ -4,27 +4,36 @@ import com.document.validator.decodeqrmicroservice.dto.GenericResponseDTO;
 import com.document.validator.decodeqrmicroservice.dto.GetFirstImageVideoRequest;
 import com.document.validator.decodeqrmicroservice.dto.SingVideoRequest;
 import com.document.validator.decodeqrmicroservice.dto.VerifyImageQrResponseDTO;
-import com.google.zxing.BinaryBitmap;
-import com.google.zxing.MultiFormatReader;
-import com.google.zxing.NotFoundException;
-import com.google.zxing.Result;
-import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
-import com.google.zxing.common.HybridBinarizer;
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
 import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.QRCodeDetector;
 import org.opencv.videoio.VideoCapture;
+import org.opencv.videoio.VideoWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import javax.imageio.ImageIO;
-import java.io.*;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.UUID;
 
 @Service
 public class DecodeQrService {
@@ -39,25 +48,72 @@ public class DecodeQrService {
 
     Logger logger = LogManager.getLogger(getClass());
 
-    public VerifyImageQrResponseDTO verifyImageQr(MultipartFile file){
+    public VerifyImageQrResponseDTO verifyImageQR(MultipartFile file) {
+        logger.info("OpenCV Version: " + Core.VERSION);
+        logger.info("|Sign|Ini."+ LocalDateTime.now());
+
+        String uuid = UUID.randomUUID().toString();
+        String rutaArchivoOriginal= workdir + File.separator + "tmp" + File.separator +
+                uuid + "."+ FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
+
         VerifyImageQrResponseDTO responseDTO =new VerifyImageQrResponseDTO();
+        String res = "";
         try {
-            BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(
-                    new BufferedImageLuminanceSource(
-                            ImageIO.read(file.getInputStream()))));
-            Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
-            System.out.println("Codigo QR: " + qrCodeResult.getText());
-            responseDTO.setData(qrCodeResult.getText());
-            responseDTO.setStatus(0);
-            responseDTO.setCodeError("DECODEQR000");
-            responseDTO.setMsgError("OK");
-        } catch (IOException | NotFoundException ex) {
-            ex.printStackTrace();
-            responseDTO.setData("");
-            responseDTO.setStatus(1);
-            responseDTO.setCodeError("DECODEQR001");
-            responseDTO.setMsgError(ex.getMessage());
+            Path copyLocationOri = Paths.get(rutaArchivoOriginal);
+            Files.copy(file.getInputStream(), copyLocationOri, StandardCopyOption.REPLACE_EXISTING);
+
+            logger.info(rutaArchivoOriginal);
+            Mat img = Imgcodecs.imread(rutaArchivoOriginal);
+            logger.info("img generado");
+            QRCodeDetector decoder = new QRCodeDetector();
+            logger.info("decoder generado");
+            Mat points = new Mat();
+            logger.info("points generado");
+            decoder.detect(img, points);
+            logger.info("decoder.detect generado");
+            String data = decoder.detectAndDecode(img, points);
+            logger.info("Intento (0) resultado...: "+ points.empty());
+            if (!points.empty() && data.length()>0) {
+                logger.info("QR detected... " );
+                logger.info("Data..:" +data);
+
+                res = data;
+            } else {
+                //Intentando redimensionar para encontrar el QR
+                Mat dst = new Mat();
+                Double fac = Double.valueOf(0);
+                logger.info("Entra a redim para buscar QR..");
+                for(double i=1; i<12; i++) {
+                    fac = (Double)(1+(i/10));
+                    System.out.print(i);
+                    Imgproc.resize(img, dst, new Size(0, 0), fac, fac, Imgproc.INTER_AREA);
+                    data = decoder.detectAndDecode(dst, points);
+                    if(!points.empty()&&data.length()>0){ //QR detected
+                        logger.info("Data..:" +data);
+                        res=data;
+                        break;
+                    }
+                }
+                logger.info("QR detected... "+!points.empty());
+                if (points.empty()||data.length()<1){
+                    for(double i=1; i<11; i++) {
+                        fac = (Double)(1+(i/2));
+                        System.out.print("Resize up:" +i);
+                        Imgproc.resize(img, dst, new Size(0, 0), fac, fac, Imgproc.INTER_AREA);
+                        data = decoder.detectAndDecode(dst, points);
+                        if(!points.empty()&&data.length()>0){ //QR detected
+                            logger.info("Data..:" +data);
+                            res=data;
+                            break;
+                        }
+                    }
+                }
+                logger.info("QR detected... "+!points.empty());
+            }
+        } catch (Exception e) {
+            logger.info("Error in trying to open file:" + e.toString());
         }
+        responseDTO.setData(res);
         return responseDTO;
     }
 
@@ -129,6 +185,4 @@ public class DecodeQrService {
         }
         return responseDTO;
     }
-
-
 }
