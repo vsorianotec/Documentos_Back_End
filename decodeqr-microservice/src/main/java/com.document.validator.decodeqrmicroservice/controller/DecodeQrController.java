@@ -32,12 +32,8 @@ public class DecodeQrController {
     public ResponseEntity<GenericResponseDTO> verifyImageQR(@RequestParam("file") MultipartFile file
                                                    ) throws Exception {
 
-        VerifyImageQrResponseDTO responseDTO= decodeQrService.verifyImageQR(file);
-
-        if(responseDTO.getStatus()==0)
-            return ResponseEntity.ok(responseDTO);
-        else
-            return ResponseEntity.badRequest().body(responseDTO);
+        VerifyImageQrResponseDTO responseDTO= decodeQrService.verifyImageQr(file);
+        return ResponseEntity.ok(responseDTO);
     }
 
     @PostMapping("/addQRVideo")
