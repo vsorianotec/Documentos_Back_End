@@ -11,8 +11,6 @@ RUN apt install -y libopencv-dev python3-opencv;
 
 # Install ffmpeg
 
-RUN apt update && apt upgrade;
-
 RUN apt install -y ffmpeg;
 
 # Install OpenJDK-8
@@ -44,7 +42,7 @@ CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar
 # EJECUCIÓN BÁSICA:
 #     docker build -t decodeqr-image-1.0 .
 #     docker images
-#     docker run -p 9083:9083 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --name documents-docker-1.0 decodeqr-image-1.0
+#     docker run -p 9083:9083 --mount type=bind,source=/app/alipse,target=/app/alipse --name decodeqr-docker-1.0 decodeqr-image-1.0
 #     docker container stop decodeqr-docker-1.0
 #     docker rm decodeqr-docker-1.0
 #     docker rmi image decodeqr-image-1.0
@@ -53,6 +51,6 @@ CMD java -jar /opt/tmp/decodeqr-microservice-1.0.jar
 # EJECUCIÓN CON REPLICAS
 # docker swarm init
 # docker build -t decodeqr-image-1.0 .
-# docker service create -p 9083:9083 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --replicas 3 decodeqr-image-1.0
+# docker service create -p 9083:9083 --mount type=bind,source=/app/alipse,target=/app/alipse --replicas 3 decodeqr-image-1.0
 # docker service ls
 # docker service rm beautiful_solomon
