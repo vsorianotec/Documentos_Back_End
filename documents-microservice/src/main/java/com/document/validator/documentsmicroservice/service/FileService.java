@@ -189,7 +189,7 @@ public class FileService {
             Map<EncodeHintType, Object> hints = new HashMap<>();
             hints.put (EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H); // Establecer la tasa de tolerancia a fallas al valor predeterminado más alto
             hints.put (EncodeHintType.CHARACTER_SET, "UTF-8"); // La codificación de caracteres es UTF-8
-            hints.put (EncodeHintType.MARGIN, 1); // El área en blanco del código QR, el mínimo es 0 y hay bordes blancos, pero es muy pequeño, el mínimo es alrededor del 6%
+            hints.put (EncodeHintType.MARGIN, 0); // El área en blanco del código QR, el mínimo es 0 y hay bordes blancos, pero es muy pequeño, el mínimo es alrededor del 6%
 
             BitMatrix matrix=new MultiFormatWriter().encode(data, BarcodeFormat.QR_CODE, sizeQR, sizeQR, hints);
             MatrixToImageWriter.writeToPath(matrix,"jpg", Paths.get(qrCodePath));
@@ -204,16 +204,16 @@ public class FileService {
             Imgcodecs.imwrite(workdir + File.separator + "lib" + File.separator +"logo30x30.jpg", resizeimage);
 
             BufferedImage background1 = ImageIO.read(new File(qrCodePath));
-            BufferedImage foreground1 = ImageIO.read(new File(workdir + File.separator + "lib" + File.separator + "logo30x30.jpg"));
+            //BufferedImage foreground1 = ImageIO.read(new File(workdir + File.separator + "lib" + File.separator + "logo30x30.jpg"));
 
             BufferedImage bufferedImage1 = new BufferedImage(background1.getWidth(),background1.getHeight(),BufferedImage.TYPE_INT_RGB);
             Graphics2D g2d1 = bufferedImage1.createGraphics();
 
             g2d1.drawImage(background1, 0, 0,null);
 
-            int x = (background1.getWidth() - foreground1.getWidth()) / 2;
-            int y = (background1.getHeight() - foreground1.getHeight()) / 2;
-            g2d1.drawImage(foreground1, x, y, null);
+            //int x = (background1.getWidth() - foreground1.getWidth()) / 2;
+            //int y = (background1.getHeight() - foreground1.getHeight()) / 2;
+            //g2d1.drawImage(foreground1, x, y, null);
             g2d1.dispose();
             ImageIO.write(bufferedImage1,"JPEG", new File(qrCodePath));
         }catch (Exception e){

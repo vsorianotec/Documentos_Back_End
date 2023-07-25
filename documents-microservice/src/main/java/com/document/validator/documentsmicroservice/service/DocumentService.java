@@ -303,7 +303,7 @@ public class DocumentService {
             }
         }else{
             String hash= fileService.generateHash(rutaArchivoFirmado);
-            Document documentBD = documentRepository.findByHashOriginalDocument(hash);
+            Document documentBD = documentRepository.findFirstByHashOriginalDocument(hash);
             if (documentBD==null){
                 responseDTO.setStatus(1);
                 responseDTO.setCodeError("DOCU002");
