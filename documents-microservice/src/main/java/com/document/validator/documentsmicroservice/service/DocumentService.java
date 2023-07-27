@@ -6,24 +6,21 @@ import com.document.validator.documentsmicroservice.entity.User;
 import com.document.validator.documentsmicroservice.repository.UserRepository;
 import com.document.validator.documentsmicroservice.repository.DocumentRepository;
 import com.google.gson.Gson;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.Result;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
+import com.google.zxing.common.HybridBinarizer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencv.core.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLConnection;
@@ -67,9 +64,9 @@ public class DocumentService {
             String uuid = UUID.randomUUID().toString();
             String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
             String fileName= uuid + "."+ fileext;
-            String rutaArchivoFirmado= workdir + File.separator + "FilesSealed" + File.separator + fileName;
-            String rutaArchivoOriginal= workdir + File.separator + "Files" + File.separator + file.getOriginalFilename();
-            String rutaArchivoOriginalCompress= workdir + File.separator + "Files"+ File.separator + "c_"+file.getOriginalFilename();
+            String rutaArchivoFirmado= workdir + File.separator + "filesSealed" + File.separator + fileName;
+            String rutaArchivoOriginal= workdir + File.separator + "files" + File.separator + file.getOriginalFilename();
+            String rutaArchivoOriginalCompress= workdir + File.separator + "files"+ File.separator + "c_"+file.getOriginalFilename();
 
             Path copyLocation = Paths.get(rutaArchivoFirmado);
             Path copyLocationOri = Paths.get(rutaArchivoOriginal);
@@ -164,7 +161,7 @@ public class DocumentService {
             if (documentBD != null) {
                 logger.info("<4>Find with OpenCV . " + LocalDateTime.now());
                 logger.info("Begin comparing...");
-                String rutaArchivoQR = workdir + File.separator + "FilesSealed" + File.separator + documentBD.getUuid() + ".jpg";
+                String rutaArchivoQR = workdir + File.separator + "filesSealed" + File.separator + documentBD.getUuid() + ".jpg";
                 String rutaArchivoFakeSize = workdir + File.separator + "lib" + File.separator + "fake_size.jpg";
                 String rutaArchivoDiffereFake = workdir + File.separator + "tmp" + File.separator + uuid + "_differeFake.jpg";
                 double resCompare = fileService.compareContentImage(rutaArchivoQR, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
@@ -376,27 +373,29 @@ public class DocumentService {
         return response;
     }
 
-    public String verifiyImageQr(String pathfile){
+    public String verifiyImageQr(String pathImage){
         String data="";
         try {
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-            MultipartBodyBuilder multipartBodyBuilder = new MultipartBodyBuilder();
-
-            // Load a file from disk.
-            Resource file1 = new FileSystemResource(pathfile);
-            multipartBodyBuilder.part("file", file1, MediaType.IMAGE_JPEG);
-            MultiValueMap<String, HttpEntity<?>> multipartBody = multipartBodyBuilder.build();
-            HttpEntity<MultiValueMap<String, HttpEntity<?>>> httpEntity = new HttpEntity<>(multipartBody, headers);
-            ResponseEntity<VerifyImageQrResponseDTO> responseEntity = restTemplate.postForEntity(decodeqrDomain + "decodeqr/verifyImageQR", httpEntity,
-                    VerifyImageQrResponseDTO.class);
-
-            logger.info(responseEntity.getBody().getData());
-            data=responseEntity.getBody().getData();
-
+            BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(
+                    new BufferedImageLuminanceSource(
+                            ImageIO.read(new File(pathImage)))));
+            Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
+            data=qrCodeResult.getText();
         }catch(Exception e){
             logger.info(e.getMessage());
+        }
+        if(data.equals("")){
+            String pathCropImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + ".jpg";
+            try {
+                fileService.cropImage(pathImage, pathCropImage);
+                BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(
+                        new BufferedImageLuminanceSource(
+                                ImageIO.read(new File(pathCropImage)))));
+                Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
+                data=qrCodeResult.getText();
+            }catch (Exception e){
+                logger.info(e.getMessage());
+            }
         }
         return data;
     }
@@ -414,18 +413,7 @@ public class DocumentService {
     public String getFirstImageVideo(String pathVideo){
         try {
             String pathImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + ".jpg";
-            GetFirstImageVideoRequest request = new GetFirstImageVideoRequest();
-            request.setInputVideoPath(pathVideo);
-            request.setOutputImagePath(pathImage);
-
-            RestTemplate restTemplate = new RestTemplate();
-            ResponseEntity<GenericResponseDTO> responseEntity = restTemplate.postForEntity(decodeqrDomain + "decodeqr/getFirstImageVideo",
-                    request, GenericResponseDTO.class);
-            logger.info(responseEntity.getBody());
-            GenericResponseDTO responseDTO=responseEntity.getBody();
-            if(responseDTO== null || responseDTO.getStatus()!=0){
-                throw new Exception("Error en decodeqr/getFirstImageVideo");
-            }
+            fileService.getFirstImageVideo(pathVideo,pathImage);
             return pathImage;
         }catch(Exception e){
             logger.info(e.getMessage());
@@ -441,7 +429,7 @@ public class DocumentService {
             }else if(fileName.contains("differeFake.jpg")){
                 file = new File(workdir + File.separator + "tmp" + File.separator + fileName);
             }else{
-                file = new File(workdir + File.separator + "FilesSealed" + File.separator + fileName);
+                file = new File(workdir + File.separator + "filesSealed" + File.separator + fileName);
             }
             if(file.exists()){
                 //get the mimetype
@@ -465,5 +453,33 @@ public class DocumentService {
         }catch (Exception e){
             response.setStatus(400);
         }
+    }
+
+    public SingResponseDTO cropImage(MultipartFile file) {
+        SingResponseDTO responseDTO = new SingResponseDTO();
+        try {
+            logger.info("Started cropImage:" + LocalDateTime.now());
+
+            String uuid = UUID.randomUUID().toString();
+            String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename())).toLowerCase());
+            String fileName = uuid + "." + fileext;
+            String rutaArchivoRecortado = workdir + File.separator + "tmp" + File.separator + fileName;
+            String rutaArchivoOriginal = workdir + File.separator + "tmp" + File.separator + file.getOriginalFilename();
+
+            Path copyLocationOri = Paths.get(rutaArchivoOriginal);
+            Files.copy(file.getInputStream(), copyLocationOri, StandardCopyOption.REPLACE_EXISTING);
+            fileService.cropImage(rutaArchivoOriginal, rutaArchivoRecortado);
+            responseDTO.setFileName(fileName);
+            responseDTO.setStatus(0);
+            responseDTO.setCodeError("DOCU000");
+            responseDTO.setMsgError("OK");
+        } catch (Exception e) {
+            e.printStackTrace();
+            responseDTO.setStatus(0);
+            responseDTO.setCodeError("INTERNAL");
+            responseDTO.setMsgError("No se pudo guardar el archivo " + file.getOriginalFilename() + ". ¡Prueba Nuevamente!.  Exception: " + e.getMessage());
+        }
+        logger.info("Finish cropImage:" + LocalDateTime.now());
+        return responseDTO;
     }
 }

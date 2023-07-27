@@ -58,4 +58,15 @@ public class DocumentController {
         documentService.download(fileName,response);
     }
 
+    @PostMapping("/cropImage")
+    public ResponseEntity<GenericResponseDTO> cropImage(@RequestParam("file") MultipartFile file) throws Exception {
+
+        GenericResponseDTO responseDTO= documentService.cropImage(file);
+
+        if(responseDTO.getStatus()==0)
+            return ResponseEntity.ok(responseDTO);
+        else
+            return ResponseEntity.badRequest().body(responseDTO);
+    }
+
 }

@@ -11,25 +11,20 @@ import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import net.bramp.ffmpeg.FFmpeg;
+import net.bramp.ffmpeg.FFmpegExecutor;
+import net.bramp.ffmpeg.FFprobe;
+import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
-import org.opencv.videoio.VideoWriter;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -43,11 +38,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 import static org.opencv.imgcodecs.Imgcodecs.imread;
 import static org.opencv.imgproc.Imgproc.INTER_AREA;
@@ -59,8 +51,11 @@ public class FileService {
     @Value("${app.workdir}")
     public String workdir;
 
-    @Value("${app.decodeqr-microservice.domain}")
-    private String decodeqrDomain;
+    @Value("${app.ffmpegPath}")
+    public String ffmpegPath;
+
+    @Value("${app.ffprobePath}")
+    public String ffprobePath;
 
     Logger logger = LogManager.getLogger(getClass());
 
@@ -242,8 +237,9 @@ public class FileService {
             int x1 = 0, y1 = 0;
             g2d.drawImage(background, x1, y1, panel);
 
-            int x = 15;
-            int y = (background.getHeight() -15) - (foreground.getHeight() );
+            int x = 0;
+            int y = 0;
+            //int y = (background.getHeight() -15) - (foreground.getHeight() );
             g2d.drawImage(foreground, x, y, panel);
 
             g2d.dispose();
@@ -524,27 +520,72 @@ public class FileService {
 
     public void sealVideo(String inputVideoPath, String outputVideoPath, Document document) throws Exception{
         try {
-            // Contenido del código QR
-            String signature = gson.toJson(document);
             String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
-            generateQR(signature, qrCodePath, 200);
+            String firstFramePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_firstFrame.jpg";
 
-            SingVideoRequest singVideoRequest = new SingVideoRequest();
-            singVideoRequest.setInputVideoPath(inputVideoPath);
-            singVideoRequest.setOutputVideoPath(outputVideoPath);
-            singVideoRequest.setQrCodePath(qrCodePath);
+            //Generamos QR
+            String signature = gson.toJson(document);
+            getFirstImageVideo(inputVideoPath,firstFramePath);
+            Integer sizemax = getSizemaxImage(firstFramePath);
+            int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
+            sizeQR = (sizeQR<120)?120:sizeQR;
+            generateQR(signature, qrCodePath, sizeQR);
+            addQRVideo(inputVideoPath,qrCodePath,outputVideoPath);
 
-            RestTemplate restTemplate = new RestTemplate();
-            ResponseEntity<GenericResponseDTO> responseEntity = restTemplate.postForEntity(decodeqrDomain + "decodeqr/addQRVideo", singVideoRequest,
-                    GenericResponseDTO.class);
-            logger.info(responseEntity.getBody());
-            GenericResponseDTO responseDTO=responseEntity.getBody();
-            if(responseDTO== null || responseDTO.getStatus()!=0){
-                throw new Exception("Error en decodeqr/addQRVideo");
-            }
         }catch (Exception e){
             logger.info("Error en el sellado deL video");
             throw e;
+        }
+    }
+
+    public void cropImage(String inputImagePath,String outputImagePath){
+        Integer sizemax = getSizemaxImage(inputImagePath);
+        int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
+        sizeQR = (sizeQR<120)?120:sizeQR;
+        Imgcodecs Highgui1 = null;
+        Mat originalImage = Highgui1.imread(inputImagePath);
+        Rect rectCrop = new Rect(0, 0, sizeQR, sizeQR);
+        Mat croppedImage = new Mat(originalImage, rectCrop);
+        Imgcodecs.imwrite(outputImagePath , croppedImage);
+    }
+
+    public void getFirstImageVideo(String inputVideoPath,String outputImagePath) throws Exception {
+            System.out.println("inputVideoPath:" + inputVideoPath);
+
+            VideoCapture videoCapture = new VideoCapture(inputVideoPath);
+            if(!videoCapture.isOpened()){
+                throw new Exception("No se pudo abrir el video");
+            }
+
+            Mat firstFrame = new Mat();
+            if(!videoCapture.read(firstFrame)){
+                throw new Exception("No se pudo obtener el 1er frame");
+            }
+
+            Imgcodecs.imwrite(outputImagePath , firstFrame);
+    }
+
+    public void addQRVideo(String inputVideoPath,String qrCodePath,String outputVideoPath) throws Exception {
+        GenericResponseDTO responseDTO = new GenericResponseDTO();
+        try {
+            logger.info("addQRVideo:" + inputVideoPath + " - " + qrCodePath);
+
+            FFmpeg ffmpeg = new FFmpeg(ffmpegPath);
+            FFprobe ffprobe = new FFprobe(ffprobePath);
+            FFmpegBuilder builder = new FFmpegBuilder();
+            builder.addInput(inputVideoPath);
+            builder.addInput(qrCodePath);
+            builder.setComplexFilter("[0:v][1:v]overlay=eof_action=pass:enable='between(t,0,2)'");
+            builder.addOutput(outputVideoPath);
+            builder.overrideOutputFiles(true);
+            FFmpegExecutor executor = new FFmpegExecutor(ffmpeg, ffprobe);
+            // Run a one-pass encode
+            executor.createJob(builder).run();
+
+            logger.info("Se sello el video en: " + outputVideoPath);
+        }catch (Exception e){
+            logger.info("Error:" + e.getMessage());
+            throw new Exception("Error en el sellado deL video");
         }
     }
 }
