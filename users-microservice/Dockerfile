@@ -16,7 +16,7 @@ CMD java -jar /opt/tmp/users-microservice-1.0.0.jar
 # EJECUCIÓN BÁSICA:
 #     docker build -t users-image-1.0 .
 #     docker images
-#     docker run -p 9080:9080 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --name users-docker-1.0 users-image-1.0
+#     docker run -p 9080:9080 --mount type=bind,source=/app/alipse,target=/app/alipse --name users-docker-1.0 users-image-1.0
 #     docker container stop users-docker-1.0
 #     docker rm users-docker-1.0
 #     docker ps -a
@@ -24,6 +24,6 @@ CMD java -jar /opt/tmp/users-microservice-1.0.0.jar
 # EJECUCIÓN CON REPLICAS
 # docker swarm init
 # docker build -t users-image-1.0 .
-# docker service create -p 9080:9080 --mount type=bind,source=/home/alipsed/alipse,target=/app/alipse --replicas 3 users-image-1.0
+# docker service create -p 9080:9080 --mount type=bind,source=/app/alipse,target=/app/alipse --replicas 3 users-image-1.0
 # docker service ls
 # docker service rm beautiful_solomon
