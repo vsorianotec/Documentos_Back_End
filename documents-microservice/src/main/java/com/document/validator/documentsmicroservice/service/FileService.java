@@ -525,11 +525,12 @@ public class FileService {
 
             //Generamos QR
             String signature = gson.toJson(document);
-            getFirstImageVideo(inputVideoPath,firstFramePath);
-            Integer sizemax = getSizemaxImage(firstFramePath);
-            int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
-            sizeQR = (sizeQR<120)?120:sizeQR;
-            generateQR(signature, qrCodePath, sizeQR);
+            //getFirstImageVideo(inputVideoPath,firstFramePath);
+            //Integer sizemax = getSizemaxImage(firstFramePath);
+            //int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
+            //sizeQR = (sizeQR<120)?120:sizeQR;
+            //generateQR(signature, qrCodePath, sizeQR);
+            generateQR(signature, qrCodePath, 200);
             addQRVideo(inputVideoPath,qrCodePath,outputVideoPath);
 
         }catch (Exception e){
