@@ -382,10 +382,10 @@ public class DocumentService {
             Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
             data=qrCodeResult.getText();
         }catch(Exception e){
-            logger.info(e.getMessage());
+            logger.info("No se encontro datos de imagen normal");
         }
         if(data.equals("")){
-            String pathCropImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + ".jpg";
+            String pathCropImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + "_cropped.jpg";
             try {
                 fileService.cropImage(pathImage, pathCropImage);
                 BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(
@@ -394,9 +394,10 @@ public class DocumentService {
                 Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
                 data=qrCodeResult.getText();
             }catch (Exception e){
-                logger.info(e.getMessage());
+                logger.info("No se encontro datos de imagen recortada");
             }
         }
+        logger.info("verifiyImageQr: " + data);
         return data;
     }
 
@@ -412,7 +413,7 @@ public class DocumentService {
 
     public String getFirstImageVideo(String pathVideo){
         try {
-            String pathImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + ".jpg";
+            String pathImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + "_firstframe.jpg";
             fileService.getFirstImageVideo(pathVideo,pathImage);
             return pathImage;
         }catch(Exception e){

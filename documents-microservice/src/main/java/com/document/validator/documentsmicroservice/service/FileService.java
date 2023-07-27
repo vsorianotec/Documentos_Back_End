@@ -525,12 +525,9 @@ public class FileService {
 
             //Generamos QR
             String signature = gson.toJson(document);
-            //getFirstImageVideo(inputVideoPath,firstFramePath);
-            //Integer sizemax = getSizemaxImage(firstFramePath);
-            //int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
-            //sizeQR = (sizeQR<120)?120:sizeQR;
-            //generateQR(signature, qrCodePath, sizeQR);
-            generateQR(signature, qrCodePath, 200);
+            getFirstImageVideo(inputVideoPath,firstFramePath);
+            Integer sizemax = getSizemaxImage(firstFramePath);
+            generateQR(signature, qrCodePath, sizemax);
             addQRVideo(inputVideoPath,qrCodePath,outputVideoPath);
 
         }catch (Exception e){
@@ -551,23 +548,34 @@ public class FileService {
     }
 
     public void getFirstImageVideo(String inputVideoPath,String outputImagePath) throws Exception {
-            System.out.println("inputVideoPath:" + inputVideoPath);
+        try {
+            logger.info("getFirstImageVideo:" + inputVideoPath);
 
-            VideoCapture videoCapture = new VideoCapture(inputVideoPath);
-            if(!videoCapture.isOpened()){
-                throw new Exception("No se pudo abrir el video");
-            }
+            FFmpeg ffmpeg = new FFmpeg(ffmpegPath);
+            FFprobe ffprobe = new FFprobe(ffprobePath);
 
-            Mat firstFrame = new Mat();
-            if(!videoCapture.read(firstFrame)){
-                throw new Exception("No se pudo obtener el 1er frame");
-            }
+            FFmpegBuilder builder = new FFmpegBuilder()
+                    .setInput(inputVideoPath)
+                    .overrideOutputFiles(true)
+                    .addOutput(outputImagePath)
+                    .setFrames(1)
+                    .setFormat("image2")
+                    //.setVideoFilter("select='gte(n\\,10)',scale=200:-1")
+                    .done();
 
-            Imgcodecs.imwrite(outputImagePath , firstFrame);
+            FFmpegExecutor executor = new FFmpegExecutor(ffmpeg, ffprobe);
+
+            // Run a one-pass encode
+            executor.createJob(builder).run();
+
+            logger.info("Se obtuvo la imagen en: " + outputImagePath);
+        }catch (Exception e){
+            logger.info("Error:" + e.getMessage());
+            throw new Exception("Error en obtener 1ra imagen de video");
+        }
     }
 
     public void addQRVideo(String inputVideoPath,String qrCodePath,String outputVideoPath) throws Exception {
-        GenericResponseDTO responseDTO = new GenericResponseDTO();
         try {
             logger.info("addQRVideo:" + inputVideoPath + " - " + qrCodePath);
 
