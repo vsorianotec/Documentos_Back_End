@@ -8,6 +8,7 @@ import com.document.validator.documentsmicroservice.repository.DocumentRepositor
 import com.google.gson.Gson;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
 import com.google.zxing.Result;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
@@ -125,7 +126,7 @@ public class DocumentService {
 
             String seal="";
             if(fileService.isStaticImage(fileext)) {
-                seal = verifiyImageQr(rutaArchivoFirmado);
+                seal = verifiyImageQr(rutaArchivoFirmado,false);
                 return validateSealImage(seal,rutaArchivoFirmado,uuid,fileName);
             }
             else if(fileService.isVideo(fileext)){
@@ -156,8 +157,7 @@ public class DocumentService {
     private ValidateResponseDTO validateSealImage(String seal,String rutaArchivoFirmado,String uuid,String fileName) throws Exception{
         ValidateResponseDTO responseDTO = new ValidateResponseDTO();
         if (!seal.equals("")) { // Exists QR
-            Document document = gson.fromJson(seal, Document.class);
-            Document documentBD = documentRepository.findById(document.getId()).orElse(null);
+            Document documentBD = documentRepository.findFirstByUuid(seal);
             if (documentBD != null) {
                 logger.info("<4>Find with OpenCV . " + LocalDateTime.now());
                 logger.info("Begin comparing...");
@@ -167,6 +167,7 @@ public class DocumentService {
                 double resCompare = fileService.compareContentImage(rutaArchivoQR, rutaArchivoFirmado, rutaArchivoFakeSize, rutaArchivoDiffereFake);
                 double matchPorcentage = 100 - resCompare;
                 logger.info("matchPorcentage: " + matchPorcentage);
+                responseDTO.setMatchPorcentage(matchPorcentage);
                 if (matchPorcentage > acceptancePercentage) {
                     User user = userRepository.getReferenceById(documentBD.getCreatedBy());
                     logger.info("File signed: " + rutaArchivoFirmado);
@@ -223,6 +224,7 @@ public class DocumentService {
                 matchPorcentage = 100 - resCompare;
             }
             logger.info("matchPorcentage: " + matchPorcentage);
+            responseDTO.setMatchPorcentage(matchPorcentage);
             if (matchPorcentage >= acceptancePercentage) {
                 responseDTO.setDocumentId(compareMinisResponseDTO.getDocument().getId());
                 responseDTO.setCreatedDate(compareMinisResponseDTO.getDocument().getCreatedDate());
@@ -240,7 +242,7 @@ public class DocumentService {
             else if (matchPorcentage > similarityPercentage) {
                 responseDTO.setStatus(1);
                 responseDTO.setCodeError("DOCU005");
-                responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)"); //El documento contiene una firma no reconocida
+                responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\n one of the images in our database by [author] (please be warned it’s not identical)");
                 responseDTO.setFileName(uuid + "_differeFake.jpg");
 
                 logger.info("|Val|FinMiniLike." + LocalDateTime.now());
@@ -249,7 +251,7 @@ public class DocumentService {
             else {
                 responseDTO.setStatus(1);
                 responseDTO.setCodeError("DOCU001");
-                responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation"); //El documento contiene una firma no reconocida
+                responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation");
                 responseDTO.setFileName("fake.jpg");
 
                 logger.info("|Val|FinMiniFake." + LocalDateTime.now());
@@ -261,12 +263,8 @@ public class DocumentService {
     private ValidateResponseDTO validateSeal(String seal,String rutaArchivoFirmado){
         ValidateResponseDTO responseDTO = new ValidateResponseDTO();
         if(!seal.equals("")){
-            logger.info("json: " + seal);
-            //byte[] decodedBytes = Base64.decodeBase64(seal);
-            //logger.info("decodedBytes " + new String(decodedBytes));
-            //json=decodedBytes.toString();
-            Document document = gson.fromJson(seal, Document.class);
-            Document documentBD = documentRepository.findById(document.getId()).orElse(null);
+            logger.info("seal: " + seal);
+            Document documentBD = documentRepository.findFirstByUuid(seal);
             if (documentBD==null){
                 responseDTO.setStatus(1);
                 responseDTO.setCodeError("DOCU002");
@@ -373,26 +371,44 @@ public class DocumentService {
         return response;
     }
 
-    public String verifiyImageQr(String pathImage){
+    public VerifyImageQrResponseDTO verifyImageQR(MultipartFile file) {
+        logger.info("OpenCV Version: " + Core.VERSION);
+        logger.info("|verifyImageQR|Ini."+ LocalDateTime.now());
+        VerifyImageQrResponseDTO responseDTO =new VerifyImageQrResponseDTO();
+
+        String uuid = UUID.randomUUID().toString();
+        String rutaArchivoFirmado= workdir + File.separator + "tmp" + File.separator +
+                uuid + "."+ FilenameUtils.getExtension(StringUtils.cleanPath(file.getOriginalFilename()));
+
+        Path copyLocation = Paths.get(rutaArchivoFirmado);
+        try {
+            Files.copy(file.getInputStream(), copyLocation, StandardCopyOption.REPLACE_EXISTING);
+        }catch (Exception e){
+            responseDTO.setStatus(1);
+            responseDTO.setCodeError("VERIFYQR0001");
+            responseDTO.setMsgError("Error al guardar la imagen");
+            return  responseDTO;
+        }
+
+        String res = verifiyImageQr(rutaArchivoFirmado,false);
+        responseDTO.setData(res);
+
+        logger.info("|verifyImageQR|Fin."+ LocalDateTime.now());
+        return responseDTO;
+    }
+
+    public String verifiyImageQr(String pathImage,boolean videoOrigin){
         String data="";
         try {
-            BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(
-                    new BufferedImageLuminanceSource(
-                            ImageIO.read(new File(pathImage)))));
-            Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
-            data=qrCodeResult.getText();
+            data=readQR(pathImage);
         }catch(Exception e){
             logger.info("No se encontro datos de imagen normal");
         }
         if(data.equals("")){
             String pathCropImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + "_cropped.jpg";
             try {
-                fileService.cropImage(pathImage, pathCropImage);
-                BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(
-                        new BufferedImageLuminanceSource(
-                                ImageIO.read(new File(pathCropImage)))));
-                Result qrCodeResult = new MultiFormatReader().decode(binaryBitmap);
-                data=qrCodeResult.getText();
+                fileService.cropImage(pathImage, pathCropImage,videoOrigin);
+                data=readQR(pathCropImage);
             }catch (Exception e){
                 logger.info("No se encontro datos de imagen recortada");
             }
@@ -401,13 +417,30 @@ public class DocumentService {
         return data;
     }
 
+    // Function to read the QR file
+    public static String readQR(String path)
+            throws FileNotFoundException, IOException,
+            NotFoundException
+    {
+        BinaryBitmap binaryBitmap
+                = new BinaryBitmap(new HybridBinarizer(
+                new BufferedImageLuminanceSource(
+                        ImageIO.read(
+                                new FileInputStream(path)))));
+
+        Result result
+                = new MultiFormatReader().decode(binaryBitmap);
+
+        return result.getText();
+    }
+
     public String verifiyVideoQr(String pathVideo){
 
         String pathImage=getFirstImageVideo(pathVideo);
         if(pathImage.isEmpty()){
             return "";
         }else{
-            return verifiyImageQr(pathImage);
+            return verifiyImageQr(pathImage,true);
         }
     }
 
@@ -469,7 +502,7 @@ public class DocumentService {
 
             Path copyLocationOri = Paths.get(rutaArchivoOriginal);
             Files.copy(file.getInputStream(), copyLocationOri, StandardCopyOption.REPLACE_EXISTING);
-            fileService.cropImage(rutaArchivoOriginal, rutaArchivoRecortado);
+            fileService.cropImage(rutaArchivoOriginal, rutaArchivoRecortado,false);
             responseDTO.setFileName(fileName);
             responseDTO.setStatus(0);
             responseDTO.setCodeError("DOCU000");

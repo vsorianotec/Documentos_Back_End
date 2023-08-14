@@ -123,7 +123,8 @@ public class FileService {
 
     public void sealImage(String inputImagePath, String outputImagePath, Document document) throws Exception{
         try {
-            String signature = gson.toJson(document);
+            //String signature = gson.toJson(document);
+            String signature = document.getUuid();
             String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
             Integer sizemax = getSizemaxImage(inputImagePath);
             generateQR(signature, qrCodePath, sizemax);
@@ -181,40 +182,29 @@ public class FileService {
         try {
             int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
             sizeQR = (sizeQR<120)?120:sizeQR;
-            Map<EncodeHintType, Object> hints = new HashMap<>();
-            hints.put (EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H); // Establecer la tasa de tolerancia a fallas al valor predeterminado más alto
-            hints.put (EncodeHintType.CHARACTER_SET, "UTF-8"); // La codificación de caracteres es UTF-8
-            hints.put (EncodeHintType.MARGIN, 0); // El área en blanco del código QR, el mínimo es 0 y hay bordes blancos, pero es muy pequeño, el mínimo es alrededor del 6%
 
-            BitMatrix matrix=new MultiFormatWriter().encode(data, BarcodeFormat.QR_CODE, sizeQR, sizeQR, hints);
-            MatrixToImageWriter.writeToPath(matrix,"jpg", Paths.get(qrCodePath));
-
-            ////
-            Mat resizeimage;
-
-            Mat src  =  imread(workdir + File.separator + "lib" + File.separator +"logo.jpg");
-            resizeimage = new Mat();
-            Size scaleSize = new Size(30,30);
-            resize(src, resizeimage, scaleSize , 0, 0, INTER_AREA);
-            Imgcodecs.imwrite(workdir + File.separator + "lib" + File.separator +"logo30x30.jpg", resizeimage);
-
-            BufferedImage background1 = ImageIO.read(new File(qrCodePath));
-            //BufferedImage foreground1 = ImageIO.read(new File(workdir + File.separator + "lib" + File.separator + "logo30x30.jpg"));
-
-            BufferedImage bufferedImage1 = new BufferedImage(background1.getWidth(),background1.getHeight(),BufferedImage.TYPE_INT_RGB);
-            Graphics2D g2d1 = bufferedImage1.createGraphics();
-
-            g2d1.drawImage(background1, 0, 0,null);
-
-            //int x = (background1.getWidth() - foreground1.getWidth()) / 2;
-            //int y = (background1.getHeight() - foreground1.getHeight()) / 2;
-            //g2d1.drawImage(foreground1, x, y, null);
-            g2d1.dispose();
-            ImageIO.write(bufferedImage1,"JPEG", new File(qrCodePath));
+            createQR(data,qrCodePath,"UTF-8",sizeQR,sizeQR);
         }catch (Exception e){
             logger.info("Error en la generación del código QR");
             throw e;
         }
+    }
+
+    // Function to create the QR code
+    public static void createQR(String data, String path,
+                                String charset,
+                                int height, int width)
+            throws WriterException, IOException
+    {
+
+        BitMatrix matrix = new MultiFormatWriter().encode(
+                new String(data.getBytes(charset), charset),
+                BarcodeFormat.QR_CODE, width, height);
+
+        MatrixToImageWriter.writeToFile(
+                matrix,
+                path.substring(path.lastIndexOf('.') + 1),
+                new File(path));
     }
 
     public void combineImageAndQR(String inputImagePath, String qrCodePath, String outputImagePath) throws IOException{
@@ -238,8 +228,8 @@ public class FileService {
             g2d.drawImage(background, x1, y1, panel);
 
             int x = 0;
-            int y = 0;
-            //int y = (background.getHeight() -15) - (foreground.getHeight() );
+            //int y = 0;
+            int y = background.getHeight() - foreground.getHeight();
             g2d.drawImage(foreground, x, y, panel);
 
             g2d.dispose();
@@ -524,7 +514,8 @@ public class FileService {
             String firstFramePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_firstFrame.jpg";
 
             //Generamos QR
-            String signature = gson.toJson(document);
+            //String signature = gson.toJson(document);
+            String signature = document.getUuid();
             getFirstImageVideo(inputVideoPath,firstFramePath);
             Integer sizemax = getSizemaxImage(firstFramePath);
             generateQR(signature, qrCodePath, sizemax);
@@ -536,15 +527,25 @@ public class FileService {
         }
     }
 
-    public void cropImage(String inputImagePath,String outputImagePath){
-        Integer sizemax = getSizemaxImage(inputImagePath);
-        int sizeQR = sizemax/100*10; // 10% del tamaño máximo de la imagen
-        sizeQR = (sizeQR<120)?120:sizeQR;
-        Imgcodecs Highgui1 = null;
-        Mat originalImage = Highgui1.imread(inputImagePath);
-        Rect rectCrop = new Rect(0, 0, sizeQR, sizeQR);
-        Mat croppedImage = new Mat(originalImage, rectCrop);
-        Imgcodecs.imwrite(outputImagePath , croppedImage);
+    public void cropImage(String inputImagePath,String outputImagePath,boolean videoOrigin){
+        try {
+            Integer sizemax = getSizemaxImage(inputImagePath);
+            int sizeQR = sizemax / 100 * 10; // 10% del tamaño máximo de la imagen
+            sizeQR = (sizeQR < 120) ? 120 : sizeQR;
+            Imgcodecs Highgui1 = null;
+            Mat originalImage = Highgui1.imread(inputImagePath);
+            Rect rectCrop = null;
+            if (videoOrigin) {
+                rectCrop = new Rect(0, 0, sizeQR, sizeQR);
+            } else {
+                rectCrop = new Rect(0, originalImage.height()-sizeQR, sizeQR, sizeQR);
+            }
+            Mat croppedImage = new Mat(originalImage, rectCrop);
+            Imgcodecs.imwrite(outputImagePath, croppedImage);
+        }catch (Exception e){
+            logger.info("Error al cortar: " + e.getMessage());
+            throw e;
+        }
     }
 
     public void getFirstImageVideo(String inputVideoPath,String outputImagePath) throws Exception {

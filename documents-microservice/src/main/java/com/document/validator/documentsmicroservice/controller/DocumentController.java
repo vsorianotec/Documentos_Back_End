@@ -2,6 +2,7 @@ package com.document.validator.documentsmicroservice.controller;
 
 import com.document.validator.documentsmicroservice.dto.GenericResponseDTO;
 import com.document.validator.documentsmicroservice.dto.ValidateResponseDTO;
+import com.document.validator.documentsmicroservice.dto.VerifyImageQrResponseDTO;
 import com.document.validator.documentsmicroservice.service.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -69,4 +70,15 @@ public class DocumentController {
             return ResponseEntity.badRequest().body(responseDTO);
     }
 
+    @PostMapping("/verifyImageQR")
+    public ResponseEntity<GenericResponseDTO> verifyImageQR(@RequestParam("file") MultipartFile file
+    ) throws Exception {
+
+        VerifyImageQrResponseDTO responseDTO= documentService.verifyImageQR(file);
+
+        if(responseDTO.getStatus()==0)
+            return ResponseEntity.ok(responseDTO);
+        else
+            return ResponseEntity.badRequest().body(responseDTO);
+    }
 }

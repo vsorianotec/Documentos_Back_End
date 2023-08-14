@@ -11,4 +11,5 @@ public class ValidateResponseDTO extends GenericResponseDTO{
     private String originalName;
     private String author;
     private String email;
+    private Double matchPorcentage;
 }
