@@ -143,6 +143,7 @@ public class DocumentService {
             responseDTO.setCodeError("INTERNAL");
             responseDTO.setMsgError("Could not store file " + file.getOriginalFilename() + ". Please try again!. Exception: " + e.getMessage());
         }finally {
+            logger.info("|validate|FinOK."+LocalDateTime.now());
             if(Files.exists(copyLocation)){
                 try {
                     Files.delete(copyLocation);
@@ -151,7 +152,6 @@ public class DocumentService {
                 }
             }
         }
-        logger.info("|validate|FinOK."+LocalDateTime.now());
         return responseDTO;
     }
     private ValidateResponseDTO validateSealImage(String seal,String rutaArchivoFirmado,String uuid,String fileName) throws Exception{
