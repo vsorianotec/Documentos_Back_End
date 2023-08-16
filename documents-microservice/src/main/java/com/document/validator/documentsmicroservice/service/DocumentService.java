@@ -50,10 +50,6 @@ public class DocumentService {
     private double acceptancePercentage;
     @Value("${app.similarityPercentage}")
     private double similarityPercentage;
-    @Value("${app.decodeqr-microservice.domain}")
-    private String decodeqrDomain;
-
-    Gson gson = new Gson();
     Logger logger = LogManager.getLogger(getClass());
 
     public SingResponseDTO sign(MultipartFile file, String description, int userId){
