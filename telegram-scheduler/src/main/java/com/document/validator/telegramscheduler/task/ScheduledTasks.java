@@ -5,6 +5,7 @@ import com.google.gson.Gson;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -29,15 +30,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import static java.lang.Thread.sleep;
 
 @Component
-@EnableScheduling
 public class ScheduledTasks {
-
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
 
     @Value("${app.documents-microservice.domain}")
     private String documentsDomain;
@@ -52,8 +47,7 @@ public class ScheduledTasks {
 
     Gson gson = new Gson();
 
-    @Scheduled(fixedRate = 5000)
-    public void reportCurrentTime() throws IOException, InterruptedException{
+    public void checkInputFolder() throws IOException, InterruptedException{
         File carpeta = new File(telegramInPath);
         File[] lista = carpeta.listFiles();
 
