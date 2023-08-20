@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MultiValueMap;
@@ -33,6 +34,7 @@ import java.util.Date;
 import static java.lang.Thread.sleep;
 
 @Component
+@EnableScheduling
 public class ScheduledTasks {
 
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
@@ -50,8 +52,7 @@ public class ScheduledTasks {
 
     Gson gson = new Gson();
 
-    //@Scheduled(fixedRate = 5000)
-    @Scheduled(cron = "*/5 * * * * *")
+    @Scheduled(fixedRate = 5000)
     public void reportCurrentTime() throws IOException, InterruptedException{
         File carpeta = new File(telegramInPath);
         File[] lista = carpeta.listFiles();

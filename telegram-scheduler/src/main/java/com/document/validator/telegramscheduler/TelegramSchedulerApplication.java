@@ -11,7 +11,6 @@ import java.util.Calendar;
 import java.util.Date;
 
 @SpringBootApplication
-@EnableScheduling
 public class TelegramSchedulerApplication {
 
 	public static void main(String[] args) {
