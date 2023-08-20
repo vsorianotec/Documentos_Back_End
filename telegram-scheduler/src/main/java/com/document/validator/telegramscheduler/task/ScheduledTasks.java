@@ -51,6 +51,7 @@ public class ScheduledTasks {
     Gson gson = new Gson();
 
     //@Scheduled(fixedRate = 5000)
+    @Scheduled(cron = "*/5 * * * * *")
     public void reportCurrentTime() throws IOException, InterruptedException{
         File carpeta = new File(telegramInPath);
         File[] lista = carpeta.listFiles();

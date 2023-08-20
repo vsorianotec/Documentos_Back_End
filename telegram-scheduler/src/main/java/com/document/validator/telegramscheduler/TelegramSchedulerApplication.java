@@ -14,11 +14,6 @@ import java.util.Date;
 @EnableScheduling
 public class TelegramSchedulerApplication {
 
-	@Scheduled(cron = "*/5 * * * * *")
-	public void run() {
-		System.out.println("tick");
-	}
-
 	public static void main(String[] args) {
 		// Logger with diferente ID
 		Date date = Calendar.getInstance().getTime();
