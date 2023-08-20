@@ -50,7 +50,7 @@ public class ScheduledTasks {
 
     Gson gson = new Gson();
 
-    @Scheduled(fixedRate = 5000)
+    //@Scheduled(fixedRate = 5000)
     public void reportCurrentTime() throws IOException, InterruptedException{
         File carpeta = new File(telegramInPath);
         File[] lista = carpeta.listFiles();
@@ -102,7 +102,6 @@ public class ScheduledTasks {
 
             logger.info("Finish to proccess file " + file.getName());
         }
-
 
     }
 
