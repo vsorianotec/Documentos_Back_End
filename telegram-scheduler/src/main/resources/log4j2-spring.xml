@@ -5,8 +5,8 @@
             <PatternLayout pattern="%style{%d{ISO8601}}{black} %highlight{%-5level }[%style{%t}{bright,blue}] %style{%C{1.}}{bright,yellow}: %msg%n%throwable" />
         </Console>
         <RollingFile name="File"
-                     fileName="/app/aipse/logs/${sys:date_init}/telegram-scheduler_${sys:time_ini}.log"
-                     filePattern="/app/aipse/logs/$${date:yyyyMMdd}/telegram-scheduler_%d{-dd-MMMM-yyyy}-%i.log.gz">
+                     fileName="/app/alipse/logs/${sys:date_init}/telegram-scheduler_${sys:time_ini}.log"
+                     filePattern="/app/alipse/logs/$${date:yyyyMMdd}/telegram-scheduler_%d{-dd-MMMM-yyyy}-%i.log.gz">
             <PatternLayout>
                 <pattern>%d %p %C{1.} [%t] %m%n</pattern>
             </PatternLayout>
