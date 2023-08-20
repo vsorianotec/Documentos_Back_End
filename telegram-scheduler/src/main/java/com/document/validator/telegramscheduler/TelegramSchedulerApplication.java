@@ -25,6 +25,7 @@ public class TelegramSchedulerApplication {
 		try {
 			scheduledTasks.checkInputFolder();
 		}catch(Exception e){
+			e.getStackTrace();
 			System.out.println("Error run: " + e.getMessage());
 		}
 	}

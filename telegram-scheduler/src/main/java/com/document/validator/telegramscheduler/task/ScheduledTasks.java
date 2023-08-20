@@ -48,57 +48,60 @@ public class ScheduledTasks {
     Gson gson = new Gson();
 
     public void checkInputFolder() throws IOException, InterruptedException{
+        logger.info("documentsDomain: " + documentsDomain);
+        logger.info("telegramInPath: " + telegramInPath);
+        logger.info("telegramOutPath: " + telegramOutPath);
+
         File carpeta = new File(telegramInPath);
         File[] lista = carpeta.listFiles();
 
         if(lista.length > 0) {
             logger.info("Number of files in telegramInPath: " + lista.length);
-        }
+            
+            for (File file : lista) {
+                logger.info("Start to Procces file " + file.getName());
 
-        for (File file : lista) {
-            logger.info("Start to Procces file " + file.getName());
+                ValidateResponseDTO validateResponseDTO = validateFile(file.getPath());
 
-            ValidateResponseDTO validateResponseDTO = validateFile(file.getPath());
-
-            if(validateResponseDTO!=null){
-                String outputFileName="";
-                String extesion="";
-                Path inputLocation = null;
-                Path outputLocation = null;
-                InputStream inputStream = null;
-                switch (validateResponseDTO.getCodeError()){
-                    case "DOCU000":
-                        outputFileName = file.getName();
-                        outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
-                        inputLocation = Paths.get(file.getPath());
-                        Files.copy(inputLocation, outputLocation, StandardCopyOption.REPLACE_EXISTING);
-                        break;
-                    case "DOCU001":
-                    case "DOCU002":
-                    case "DOCU003":
-                        extesion=FilenameUtils.getExtension(StringUtils.cleanPath(validateResponseDTO.getFileName()));
-                        outputFileName = file.getName().replace("." + extesion,"") + "_notsealed.jpg";
-                        outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
-                        inputStream=downloadFile(validateResponseDTO.getFileName());
-                        Files.copy(inputStream, outputLocation, StandardCopyOption.REPLACE_EXISTING);
-                        break;
-                    case "DOCU004":
-                    case "DOCU005":
-                        extesion=FilenameUtils.getExtension(StringUtils.cleanPath(validateResponseDTO.getFileName()));
-                        outputFileName = file.getName().replace("." + extesion,"") + "_differeFake.jpg";
-                        outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
-                        inputStream=downloadFile(validateResponseDTO.getFileName());
-                        Files.copy(inputStream, outputLocation, StandardCopyOption.REPLACE_EXISTING);
-                        break;
+                if(validateResponseDTO!=null){
+                    String outputFileName="";
+                    String extesion="";
+                    Path inputLocation = null;
+                    Path outputLocation = null;
+                    InputStream inputStream = null;
+                    switch (validateResponseDTO.getCodeError()){
+                        case "DOCU000":
+                            outputFileName = file.getName();
+                            outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
+                            inputLocation = Paths.get(file.getPath());
+                            Files.copy(inputLocation, outputLocation, StandardCopyOption.REPLACE_EXISTING);
+                            break;
+                        case "DOCU001":
+                        case "DOCU002":
+                        case "DOCU003":
+                            extesion=FilenameUtils.getExtension(StringUtils.cleanPath(validateResponseDTO.getFileName()));
+                            outputFileName = file.getName().replace("." + extesion,"") + "_notsealed.jpg";
+                            outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
+                            inputStream=downloadFile(validateResponseDTO.getFileName());
+                            Files.copy(inputStream, outputLocation, StandardCopyOption.REPLACE_EXISTING);
+                            break;
+                        case "DOCU004":
+                        case "DOCU005":
+                            extesion=FilenameUtils.getExtension(StringUtils.cleanPath(validateResponseDTO.getFileName()));
+                            outputFileName = file.getName().replace("." + extesion,"") + "_differeFake.jpg";
+                            outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
+                            inputStream=downloadFile(validateResponseDTO.getFileName());
+                            Files.copy(inputStream, outputLocation, StandardCopyOption.REPLACE_EXISTING);
+                            break;
+                    }
+                    logger.info("outputFileName: " + outputFileName);
                 }
-                logger.info("outputFileName: " + outputFileName);
+
+                file.delete();
+
+                logger.info("Finish to proccess file " + file.getName());
             }
-
-            file.delete();
-
-            logger.info("Finish to proccess file " + file.getName());
         }
-
     }
 
     public ValidateResponseDTO validateFile(String pathfile){
