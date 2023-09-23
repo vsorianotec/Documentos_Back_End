@@ -23,6 +23,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
+import java.awt.image.RenderedImage;
 import java.io.*;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -83,8 +84,10 @@ public class DocumentService {
                 fileService.generateCompressImage(rutaArchivoOriginal,rutaArchivoOriginalCompress);
                 fileService.generateThumbnail(rutaArchivoOriginal, workdir + File.separator + "min"+ File.separator+"m_"+uuid+".jpg");
                 fileService.sealImage(rutaArchivoOriginal,rutaArchivoFirmado,document);
-            }else if(fileService.isVideo(fileext)){
-                fileService.sealVideo(rutaArchivoOriginal,rutaArchivoFirmado,document);
+            }else if(fileService.isVideo(fileext)) {
+                fileService.sealVideo(rutaArchivoOriginal, rutaArchivoFirmado, document);
+            }else if(fileService.isPDF(fileext)){
+                fileService.sealPDF(rutaArchivoOriginal,rutaArchivoFirmado,document);
             }else {
                 fileService.sealFile(rutaArchivoOriginal,rutaArchivoFirmado,document);
             }
@@ -127,6 +130,10 @@ public class DocumentService {
             }
             else if(fileService.isVideo(fileext)){
                 seal = verifiyVideoQr(rutaArchivoFirmado);
+                return validateSeal(seal,rutaArchivoFirmado);
+            }
+            else if(fileService.isPDF(fileext)){
+                seal = verifiyPDFQr(rutaArchivoFirmado);
                 return validateSeal(seal,rutaArchivoFirmado);
             }
             else{
@@ -512,4 +519,26 @@ public class DocumentService {
         logger.info("Finish cropImage:" + LocalDateTime.now());
         return responseDTO;
     }
+
+    public String verifiyPDFQr(String pathPDF){
+
+        List<String> images= fileService.getImagesFromPDF(pathPDF);
+        if(images.isEmpty()){
+            return "";
+        }else{
+            String data = "";
+            for (String pathImage :images){
+                try{
+                    data = readQR(pathImage);
+                }catch (Exception e){
+
+                }
+                if(!data.isEmpty()){
+                    break;
+                }
+            }
+            return data;
+        }
+    }
+
 }

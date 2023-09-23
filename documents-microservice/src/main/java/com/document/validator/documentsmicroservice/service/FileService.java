@@ -13,6 +13,14 @@ import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -70,10 +78,17 @@ public class FileService {
     }
 
     public boolean isStaticImage(String fileExtension){
+        fileExtension = fileExtension.toLowerCase(Locale.ROOT);
         return fileExtension.equals("jpg") || fileExtension.equals("jpeg") || fileExtension.equals("png") || fileExtension.equals("jfif");
     }
     public boolean isVideo(String fileExtension){
+        fileExtension = fileExtension.toLowerCase(Locale.ROOT);
         return fileExtension.equals("mp4") || fileExtension.equals("avi");
+    }
+    public boolean isPDF(String fileExtension){
+        fileExtension = fileExtension.toLowerCase(Locale.ROOT);
+        return fileExtension.equals("pdf");
+
     }
 
     public void generateCompressImage(String inputImagePath,String outputImagePath) throws IOException {
@@ -122,6 +137,23 @@ public class FileService {
             Integer sizemax = getSizemaxImage(inputImagePath);
             generateQR(signature, qrCodePath, sizemax);
             combineImageAndQR(inputImagePath,qrCodePath,outputImagePath);
+
+            Path fileQRLocation = Paths.get(qrCodePath);
+            Files.delete(fileQRLocation);
+            logger.info("Imagen Sellada ");
+        }catch (Exception e){
+            logger.info("Error en el sellado de la Imagen");
+            throw e;
+        }
+    }
+
+    public void sealPDF(String inputImagePath, String outputImagePath, Document document) throws Exception{
+        try {
+            //String signature = gson.toJson(document);
+            String signature = document.getUuid();
+            String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
+            generateQR(signature, qrCodePath, 0);
+            combinePDFAndQR(inputImagePath,qrCodePath,outputImagePath);
 
             Path fileQRLocation = Paths.get(qrCodePath);
             Files.delete(fileQRLocation);
@@ -590,5 +622,71 @@ public class FileService {
             logger.info("Error:" + e.getMessage());
             throw new Exception("Error en el sellado deL video");
         }
+    }
+
+    public void combinePDFAndQR(String inputPDFPath, String qrCodePath, String outputPDFPath) throws IOException{
+        try {
+            PDDocument pdfDocument = PDDocument.load(new File(inputPDFPath));
+
+            PDImageXObject pdImage = PDImageXObject.createFromFile(qrCodePath, pdfDocument);
+
+            PDPage primeraPagina = pdfDocument.getPage(0);
+            PDResources resources = primeraPagina.getResources();
+            if (resources == null) {
+                resources = new PDResources();
+                primeraPagina.setResources(resources);
+            }
+
+            PDPageContentStream contentStream = new PDPageContentStream(pdfDocument, primeraPagina, PDPageContentStream.AppendMode.APPEND, true, true);
+
+            float imagenWidth = pdImage.getWidth();
+            float imagenHeight = pdImage.getHeight();
+            float x = 0; // Posición horizontal de la imagen
+            float y = primeraPagina.getBBox().getHeight() - imagenHeight; // Posición vertical de la imagen
+
+            contentStream.drawImage(pdImage, x, y, imagenWidth, imagenHeight);
+
+            contentStream.close();
+
+            pdfDocument.save(outputPDFPath);
+            pdfDocument.close();
+
+            System.out.println("Imagen insertada correctamente en la primera página del PDF.");
+
+        } catch (IOException e) {
+            logger.info("Error en la combinación de la Imagen y el QR");
+            throw e;
+        }
+    }
+
+    public List<String> getImagesFromPDF(String pathPDF) {
+        try {
+            PDDocument pdfDocument = PDDocument.load(new File(pathPDF));
+            PDPage page = pdfDocument.getPage(0);
+
+            return getImagesFromResources(page.getResources());
+        }catch (Exception e){
+            return new ArrayList<String>();
+        }
+    }
+
+    private List<String> getImagesFromResources(PDResources resources) throws IOException {
+        List<String> images = new ArrayList<>();
+        if(resources==null)
+            return  images;
+
+        for (COSName xObjectName : resources.getXObjectNames()) {
+            PDXObject xObject = resources.getXObject(xObjectName);
+
+            if (xObject instanceof PDFormXObject) {
+                images.addAll(getImagesFromResources(((PDFormXObject) xObject).getResources()));
+            } else if (xObject instanceof PDImageXObject) {
+                String pathImage = workdir + File.separator + "tmp"+File.separator+UUID.randomUUID().toString() + "_imagePDF.jpg";
+                ImageIO.write(((PDImageXObject)xObject).getImage(), "png", new File(pathImage));
+                images.add(pathImage);
+            }
+        }
+
+        return images;
     }
 }
