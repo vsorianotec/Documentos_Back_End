@@ -152,7 +152,7 @@ public class FileService {
             //String signature = gson.toJson(document);
             String signature = document.getUuid();
             String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
-            generateQR(signature, qrCodePath, 0);
+            createQR(signature,qrCodePath,"UTF-8",120,120);
             combinePDFAndQR(inputImagePath,qrCodePath,outputImagePath);
 
             Path fileQRLocation = Paths.get(qrCodePath);

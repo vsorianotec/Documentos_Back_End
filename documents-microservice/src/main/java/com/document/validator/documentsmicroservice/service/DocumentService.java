@@ -533,7 +533,7 @@ public class DocumentService {
                 }catch (Exception e){
 
                 }
-                if(!data.isEmpty()){
+                if(!data.isEmpty() && data.length()==36){
                     break;
                 }
             }
