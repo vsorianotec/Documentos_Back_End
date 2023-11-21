@@ -80,16 +80,16 @@ public class ScheduledTasks {
                     case "DOCU001":
                     case "DOCU002":
                     case "DOCU003":
-                        extesion=FilenameUtils.getExtension(StringUtils.cleanPath(validateResponseDTO.getFileName()));
-                        outputFileName = file.getName().replace("." + extesion,"") + "_notsealed.jpg";
+                        extesion=FilenameUtils.getExtension(StringUtils.cleanPath(file.getPath()));
+                        outputFileName = file.getName().replace("." + extesion,"_") + "notsealed.jpg";
                         outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
                         inputStream=downloadFile(validateResponseDTO.getFileName());
                         Files.copy(inputStream, outputLocation, StandardCopyOption.REPLACE_EXISTING);
                         break;
                     case "DOCU004":
                     case "DOCU005":
-                        extesion=FilenameUtils.getExtension(StringUtils.cleanPath(validateResponseDTO.getFileName()));
-                        outputFileName = file.getName().replace("." + extesion,"") + "_differeFake.jpg";
+                        extesion=FilenameUtils.getExtension(StringUtils.cleanPath(file.getPath()));
+                        outputFileName = file.getName().replace("." + extesion,"_") + "differeFake.jpg";
                         outputLocation = Paths.get(telegramOutPath + File.separator + outputFileName);
                         inputStream=downloadFile(validateResponseDTO.getFileName());
                         Files.copy(inputStream, outputLocation, StandardCopyOption.REPLACE_EXISTING);
