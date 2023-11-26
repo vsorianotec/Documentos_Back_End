@@ -186,11 +186,13 @@ public class DocumentService {
                     logger.info("|Val|ConQROK." + LocalDateTime.now());
                     return responseDTO;
                 } else if (matchPorcentage > similarityPercentage) {
+                    User user = userRepository.getReferenceById(documentBD.getCreatedBy());
+                    logger.info("File signed: " + rutaArchivoFirmado);
                     responseDTO.setStatus(1);
                     responseDTO.setCodeError("DOCU004");
                     responseDTO.setMsgError("Not an Alipsé Sealed File, yet it looks VERY MUCH LIKE\none of the images in our database by [author] (please be warned it’s not identical) "); // Firmado, pero  muy parecido.
                     responseDTO.setFileName(uuid + "_differeFake.jpg");
-
+                    responseDTO.setAuthor(user.getName());
                     logger.info("|Val|SinQRcomparingFinFake." + LocalDateTime.now());
                     return responseDTO;
                 } else {
