@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.document.validator</groupId>
 	<artifactId>documents-microservice</artifactId>
-	<version>1.0.0</version>
+	<version>1.0.1</version>
 	<name>documents-microservice</name>
 	<description>Documents Microservice</description>
 	<properties>
