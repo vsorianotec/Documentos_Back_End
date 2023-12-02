@@ -153,6 +153,7 @@ public class FileService {
             String signature = document.getUuid();
             String qrCodePath = workdir + File.separator + "tmp" + File.separator + document.getUuid() + "_CodeQR.jpg";
             createQR(signature,qrCodePath,"UTF-8",120,120);
+            agregarLogo(qrCodePath,120);
             combinePDFAndQR(inputImagePath,qrCodePath,outputImagePath);
 
             Path fileQRLocation = Paths.get(qrCodePath);
@@ -209,17 +210,34 @@ public class FileService {
             sizeQR = (sizeQR<120)?120:sizeQR;
 
             createQR(data,qrCodePath,"UTF-8",sizeQR,sizeQR);
+            agregarLogo(qrCodePath,sizeQR);
         }catch (Exception e){
             logger.info("Error en la generación del código QR");
             throw e;
         }
     }
+    public void agregarLogo(String qrCodePath, int sizeQR)throws IOException, WriterException{
+            String logoPath = workdir + File.separator + "tmp" + File.separator + "logo30x30.jpg";
+            int sizeLogo = sizeQR / 8;
+            Mat resizeimage = new Mat();
+            Mat src = imread(workdir + File.separator + "lib" + File.separator + "logo.jpg");
+            Size scaleSize = new Size(sizeLogo, sizeLogo);
+            resize(src, resizeimage, scaleSize, 0, 0, INTER_AREA);
+            Imgcodecs.imwrite(logoPath, resizeimage);
+            BufferedImage background1 = ImageIO.read(new File(qrCodePath));
+            BufferedImage foreground1 = ImageIO.read(new File(logoPath));
+            BufferedImage bufferedImage1 = new BufferedImage(background1.getWidth(), background1.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics2D g2d1 = bufferedImage1.createGraphics();
+            g2d1.drawImage(background1, 0, 0, null);
+            int x = (background1.getWidth() - foreground1.getWidth()) / 2;
+            int y = (background1.getHeight() - foreground1.getHeight()) / 2;
+            g2d1.drawImage(foreground1, x, y, null);
+            g2d1.dispose();
+            ImageIO.write(bufferedImage1, "JPEG", new File(qrCodePath));
+    }
 
     // Function to create the QR code
-    public static void createQR(String data, String path,
-                                String charset,
-                                int height, int width)
-            throws WriterException, IOException
+    public static void createQR(String data, String path, String charset, int height, int width) throws WriterException, IOException
     {
 
         BitMatrix matrix = new MultiFormatWriter().encode(
@@ -545,6 +563,9 @@ public class FileService {
             Integer sizemax = getSizemaxImage(firstFramePath);
             generateQR(signature, qrCodePath, sizemax);
             addQRVideo(inputVideoPath,qrCodePath,outputVideoPath);
+
+            Path fileQRLocation = Paths.get(qrCodePath);
+            Files.delete(fileQRLocation);
 
         }catch (Exception e){
             logger.info("Error en el sellado deL video");
