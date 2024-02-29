@@ -32,8 +32,8 @@ public class Document {
                 "createdDate=" + createdDate +
                 "createdBy=" + createdBy +
                 "hashOriginalDocument=" + hashOriginalDocument +
-                "hashSignedDocument=" + fileName +
-                "fileName=" + hashSignedDocument +
+                "hashSignedDocument=" + hashSignedDocument +
+                "fileName=" + fileName +
                 "]";
     }
 }

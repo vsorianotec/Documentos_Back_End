@@ -276,7 +276,7 @@ public class DocumentService {
                 responseDTO.setMsgError("Alipsé Sealed FAKE file\n [the author] invests to avoid impersonation");
                 responseDTO.setFileName("fake.jpg");
 
-                logger.info("|Val|SinQRFake."+LocalDateTime.now());
+                logger.info("|Val|ConQRFake."+LocalDateTime.now());
                 return responseDTO;
             }else if(!documentBD.getHashSignedDocument().equals(fileService.generateHash(rutaArchivoFirmado))) {
                 responseDTO.setStatus(1);
@@ -284,7 +284,7 @@ public class DocumentService {
                 responseDTO.setMsgError("Not an Alipsé Sealed File, we cannot determine its authenticity");
                 responseDTO.setFileName("fake.jpg");
 
-                logger.info("|Val|SinQRFake."+LocalDateTime.now());
+                logger.info("|Val|ConQRFake."+LocalDateTime.now());
                 return responseDTO;
             }else{
                 User user = userRepository.getReferenceById(documentBD.getCreatedBy());
@@ -298,7 +298,7 @@ public class DocumentService {
                 responseDTO.setOriginalName(documentBD.getFileName());
                 responseDTO.setAuthor(user.getName());
                 responseDTO.setEmail(user.getEmail());
-                logger.info("|Val|SinQROK."+LocalDateTime.now());
+                logger.info("|Val|ConQROK."+LocalDateTime.now());
                 return responseDTO;
             }
         }else{
@@ -483,7 +483,7 @@ public class DocumentService {
                  * Here we have mentioned it to show inline
                  */
                 logger.info("filename: " + file.getName());
-                response.setHeader("Content-Disposition", String.format("inline; filename=\"" + file.getName() + "\""));
+                response.setHeader("Content-Disposition", String.format("inline; filename=\"" + getSignedFileName(fileName) + "\""));
                 response.setContentLength((int) file.length());
                 InputStream inputStream = new BufferedInputStream(new FileInputStream(file));
                 FileCopyUtils.copy(inputStream, response.getOutputStream());
@@ -540,6 +540,17 @@ public class DocumentService {
                 }
             }
             return data;
+        }
+    }
+
+    public String getSignedFileName(String fileName){
+        try {
+            String extension = FilenameUtils.getExtension(fileName);
+            String uuid = fileName.replaceAll("." + extension, "");
+            Document document = documentRepository.findFirstByUuid(uuid);
+            return document.getFileName().replaceAll("." + extension, "_alipsealed." + extension);
+        }catch (Exception e){
+            return fileName;
         }
     }
 
