@@ -56,7 +56,14 @@ public class DocumentController {
     public void downloadPDFResource(HttpServletRequest request, HttpServletResponse response,
                                     @PathVariable("fileName") String fileName) throws IOException {
 
-        documentService.download(fileName,response);
+        documentService.download(fileName,response,null);
+    }
+
+    @RequestMapping("/download/{uuid}/{fileName:.+}")
+    public void downloadPDFResource(HttpServletRequest request, HttpServletResponse response,
+                                    @PathVariable("fileName") String fileName,@PathVariable("uuid") String uuid) throws IOException {
+
+        documentService.download(fileName,response,uuid);
     }
 
     @PostMapping("/cropImage")

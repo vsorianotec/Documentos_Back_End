@@ -94,7 +94,7 @@ public class DocumentService {
             document.setHashSignedDocument(fileService.generateHash(rutaArchivoFirmado));
             documentRepository.save(document);
 
-            responseDTO.setFileName(fileName);
+            responseDTO.setFileName(uuid + "/" + getSignedFileName(StringUtils.cleanPath(file.getOriginalFilename())));
             responseDTO.setStatus(0);
             responseDTO.setCodeError("DOCU000");
             responseDTO.setMsgError("OK");
@@ -460,15 +460,16 @@ public class DocumentService {
         }
     }
 
-    public void download(String fileName,HttpServletResponse response){
+    public void download(String fileName,HttpServletResponse response,String uuid){
         try {
+            String fileext = fileService.changeFileExtension(FilenameUtils.getExtension(StringUtils.cleanPath(fileName)).toLowerCase());
             File file = null;
             if(fileName.equals("fake.jpg")){
                 file = new File(workdir + File.separator + "lib" + File.separator + "fake.jpg");
             }else if(fileName.contains("differeFake.jpg")){
                 file = new File(workdir + File.separator + "tmp" + File.separator + fileName);
             }else{
-                file = new File(workdir + File.separator + "filesSealed" + File.separator + fileName);
+                file = new File(workdir + File.separator + "filesSealed" + File.separator + uuid + "." + fileext);
             }
             if(file.exists()){
                 //get the mimetype
@@ -483,7 +484,7 @@ public class DocumentService {
                  * Here we have mentioned it to show inline
                  */
                 logger.info("filename: " + file.getName());
-                response.setHeader("Content-Disposition", String.format("inline; filename=\"" + getSignedFileName(fileName) + "\""));
+                response.setHeader("Content-Disposition", String.format("inline; filename=\"" + fileName + "\""));
                 response.setContentLength((int) file.length());
                 InputStream inputStream = new BufferedInputStream(new FileInputStream(file));
                 FileCopyUtils.copy(inputStream, response.getOutputStream());
@@ -546,9 +547,9 @@ public class DocumentService {
     public String getSignedFileName(String fileName){
         try {
             String extension = FilenameUtils.getExtension(fileName);
-            String uuid = fileName.replaceAll("." + extension, "");
-            Document document = documentRepository.findFirstByUuid(uuid);
-            return document.getFileName().replaceAll("." + extension, "_alipsealed." + extension);
+            String nombreSinExtesion = fileName.replaceAll("." + extension, "");
+            nombreSinExtesion = nombreSinExtesion.replaceAll(" ","_");
+            return nombreSinExtesion + "_alipsealed." + fileService.changeFileExtension(extension);
         }catch (Exception e){
             return fileName;
         }
