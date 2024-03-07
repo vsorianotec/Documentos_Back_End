@@ -628,11 +628,21 @@ public class FileService {
 
             FFmpeg ffmpeg = new FFmpeg(ffmpegPath);
             FFprobe ffprobe = new FFprobe(ffprobePath);
+            /*
             FFmpegBuilder builder = new FFmpegBuilder();
             builder.addInput(inputVideoPath);
             builder.addInput(qrCodePath);
             builder.setComplexFilter("[0:v][1:v]overlay=eof_action=pass:enable='between(t,0,2)'");
             builder.addOutput(outputVideoPath);
+            */
+            FFmpegBuilder builder = new FFmpegBuilder()
+                    .addInput(inputVideoPath)
+                    .addInput(qrCodePath)
+                    .setComplexFilter("[0:v][1:v]overlay=eof_action=pass:enable='between(t,0,2)'")
+                    .addOutput(outputVideoPath)
+                    .addExtraArgs("-c:a","copy")
+                    .done();
+
             builder.overrideOutputFiles(true);
             FFmpegExecutor executor = new FFmpegExecutor(ffmpeg, ffprobe);
             // Run a one-pass encode
